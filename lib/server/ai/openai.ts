@@ -62,6 +62,12 @@ const openAiChatResponseJsonSchema = {
   }
 };
 
+function chatCompletionsUrl() {
+  const baseUrl = process.env.AI_API_BASE_URL?.replace(/\/$/, "") || "https://api.openai.com/v1";
+
+  return `${baseUrl}/chat/completions`;
+}
+
 function createMessageContent(input: Parameters<ChatProvider["complete"]>[0]) {
   const textContent = {
     type: "text",
@@ -98,14 +104,19 @@ export function createOpenAiChatProvider(): ChatProvider {
         throw new Error("AI_API_KEY is required for OpenAI chat");
       }
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const model = process.env.AI_MODEL_MULTIMODAL;
+      if (!model) {
+        throw new Error("AI_MODEL_MULTIMODAL is required for OpenAI-compatible chat");
+      }
+
+      const response = await fetch(chatCompletionsUrl(), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: process.env.AI_MODEL_MULTIMODAL || "gpt-4o-mini",
+          model,
           messages: [
             { role: "system", content: buildRiffSystemPrompt() },
             { role: "user", content: createMessageContent(input) }

@@ -1,87 +1,81 @@
-# PR4 conversation loop handoff
+# PR4 对话主链路交接说明
 
-## Why this note exists
+## 这份说明的目的
 
-During the PR4 review, the conversation loop looked complete at first because
-`/api/chat` received a `snapshot` field. The gap was subtler: the page was using
-the most recently stored snapshot instead of capturing the current camera frame
-after ASR completed.
+PR4 的目标是把 PR1 到 PR3 的摄像头、ASR 和 `/api/chat` 能力串成同一轮可演示对话。之前最容易出错的点不是“有没有把 snapshot 发给 `/api/chat`”，而是“是不是在 ASR 完成后，为当前 turn 重新截取当前画面”。
 
-That breaks the documented P0 order:
+文档要求的 P0 顺序是：
 
 ```text
-voice -> ASR userText -> fresh camera snapshot -> POST /api/chat -> structured UI
+语音输入 -> ASR userText -> 当前摄像头截图 -> POST /api/chat -> 结构化对话 UI
 ```
 
-If a user starts the camera and speaks twice, the second turn must not silently
-reuse an old manual snapshot. It must either capture a fresh frame for that turn
-or send `snapshot: null` and let the visual fallback reason explain the missing
-visual signal.
+如果用户连续说两轮，第二轮不能复用旧的手动截图。每轮都必须要么截取一张新的当前帧，要么发送 `snapshot: null`，并让视觉失败原因解释为什么没有视觉依据。
 
-## PR4 behavior to preserve
+## 当前 PR4 行为
 
-- `Home` owns the conversation turn list.
-- Each ASR transcript creates one turn with:
+- `Home` 维护对话 turn 列表。
+- 每条 ASR transcript 会创建一个 turn，包含：
   - `sessionId`
   - `turnId`
   - `userText`
-  - the snapshot payload captured for that turn, or `null`
-  - submit status
-  - structured chat response
-  - failure reason when chat submission fails
-- `CameraPreview` exposes `captureSnapshot()` through a ref.
-- `Home.submitChat()` calls `captureSnapshot()` immediately before posting to
-  `/api/chat`.
-- If the camera is not ready, `captureSnapshot()` returns `null`; the app should
-  continue with voice-only fallback rather than inventing a visual scene.
-- The next chat request includes a lightweight `historySummary` from recent
-  completed turns.
+  - 当前 turn 截到的 snapshot，或 `null`
+  - 提交状态
+  - 结构化 chat response
+  - chat 失败时的 fallback reason
+- `CameraPreview` 通过 ref 暴露 `captureSnapshot()`。
+- `Home.submitChat()` 在调用 `/api/chat` 之前立即执行 `captureSnapshot()`。
+- 摄像头不可用时，`captureSnapshot()` 返回 `null`，页面继续走纯语音 fallback，而不是编造视觉观察。
+- 下一轮 chat 请求会带上最近几轮完成 turn 生成的轻量 `historySummary`。
+- UI 展示用户文本、AI 回复、视觉依据和音乐建议。
 
-## Regression coverage
+## 与原始文档对照
 
-Keep these tests when changing the PR4 flow:
+已满足：
+
+- 每轮 ASR 后生成当前截图或明确视觉不可用。
+- `/api/chat` 收到 `sessionId`、`turnId`、`userText`、`snapshot`、`motionSignal`、`historySummary`。
+- AI 回复展示 `replyText`、`visualObservation`、`musicSuggestion`、`followUpQuestion`、`suggestedActions`。
+- 视觉不可用时展示 `failureReason`，不编造观察。
+- 连续 turn 保留在页面中，并把历史摘要传给下一轮。
+
+未包含在 PR4：
+
+- 七牛云存储证据。该部分属于 PR5。
+- TTS、音乐生成和动作能量检测。它们属于后续范围。
+
+## 回归测试
+
+修改 PR4 主链路时必须保留这些测试：
 
 - `tests/unit/home-chat-flow.test.tsx`
-  - submits ASR text to `/api/chat`
-  - captures a fresh camera snapshot before chat submission
-  - keeps consecutive turns visible and sends history into the next request
+  - ASR 文本提交到 `/api/chat`
+  - chat 提交前截取当前摄像头 snapshot
+  - 连续 turn 可见，并向下一轮发送 history summary
 - `tests/unit/visual-evidence.test.tsx`
-  - usable visual evidence
-  - unusable visual fallback reason
-  - low-confidence visual observation
+  - 可用视觉依据
+  - 不可用视觉 fallback reason
+  - 低置信度视觉观察
 - `tests/unit/music-suggestion-card.test.tsx`
-  - populated music direction fields
-  - missing optional fields do not hide populated fields
+  - 展示已填充的音乐建议字段
+  - 可选字段缺失时不隐藏已有字段
 
-## PR5 implications
+## 给 PR5 的边界
 
-PR5 should build storage from the turn boundary above.
+PR5 应基于 PR4 的 turn 边界做存储。
 
-Do:
+应做：
 
-- persist the same per-turn snapshot that was submitted to `/api/chat`
-- persist the validated chat response as turn JSON
-- merge completed turns into session JSON
-- keep fake storage available for local and CI runs
-- make Qiniu upload failures non-blocking for the AI reply
+- 持久化同一个 turn 提交给 `/api/chat` 的 snapshot。
+- 持久化校验后的 chat response 为 turn JSON。
+- 将完成的 turn 合并进 session JSON。
+- 保留 fake storage，支持本地和 CI。
+- 七牛上传失败不能阻塞 AI reply。
 
-Do not:
+不应做：
 
-- recapture a second snapshot in the storage layer
-- rely on a stale global `latestSnapshot`
-- expose Qiniu access keys to the browser bundle
-- make storage success a prerequisite for rendering `replyText`
+- 在 storage 层重新截图。
+- 依赖旧的全局 `latestSnapshot`。
+- 把七牛 AK/SK 暴露给浏览器。
+- 让 storage 成功成为渲染 `replyText` 的前置条件。
 
-## PR5 readiness checklist
-
-Before starting PR5 code, confirm:
-
-- PR4 branch has a clean worktree.
-- `/api/chat` receives the fresh per-turn snapshot or `null`.
-- `ChatResponse.qiniu` is already optional in the contract and can be populated
-  by PR5 without breaking PR4 UI.
-- Storage paths follow the original plan:
-  - `snapshots/{sessionId}/{turnId}.webp`
-  - `turns/{sessionId}/{turnId}.json`
-  - `sessions/{sessionId}.json`
-  - `audio/{sessionId}/{assetId}.mp3`

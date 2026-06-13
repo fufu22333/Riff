@@ -5,8 +5,9 @@ const requiredText = z.string().trim().min(1);
 export const envSchema = z.object({
   AI_PROVIDER: z.enum(["openai", "fake"]).default("openai"),
   AI_API_KEY: requiredText,
+  AI_API_BASE_URL: z.string().trim().url().optional(),
   AI_MODEL_MULTIMODAL: requiredText,
-  AI_MODEL_TEXT: requiredText.default("gpt-5.4-mini"),
+  AI_MODEL_TEXT: requiredText.default("qwen-plus"),
   ASR_PROVIDER: z.enum(["openai", "fake"]).default("openai"),
   ASR_API_KEY: requiredText,
   ASR_MODEL: requiredText,
