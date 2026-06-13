@@ -33,6 +33,21 @@ function clickByText(text: string) {
   });
 }
 
+function createFallbackTtsResponse() {
+  return new Response(
+    JSON.stringify({
+      status: "fallback",
+      ttsJobId: "tts-fallback",
+      ttsUrl: null,
+      errorCode: null
+    }),
+    {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    }
+  );
+}
+
 afterEach(() => {
   act(() => {
     root?.unmount();
@@ -44,6 +59,102 @@ afterEach(() => {
 });
 
 describe("home chat flow", () => {
+  it("shows the chat reply before surfacing async TTS failure state", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/api/asr") {
+        return new Response(JSON.stringify({ userText: "Make it feel like midnight rain", provider: "fake" }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
+      if (input === "/api/chat") {
+        return new Response(
+          JSON.stringify({
+            sessionId: "session-1",
+            turnId: "turn-1",
+            replyText: "The text reply should remain visible while TTS fails later.",
+            visualObservation: {
+              isUsable: false,
+              summary: null,
+              objects: [],
+              sceneMood: null,
+              motionEnergy: null,
+              confidence: 0,
+              failureReason: "no_visual_subject"
+            },
+            musicSuggestion: {
+              mood: "midnight rain",
+              tempo: "74 BPM",
+              instruments: ["felt piano", "soft pad"],
+              structure: "quiet intro -> pulse",
+              promptForMusicGen: "midnight rain sparse felt piano"
+            },
+            followUpQuestion: null,
+            suggestedActions: []
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      if (input === "/api/tts") {
+        return new Response(
+          JSON.stringify({
+            status: "pending",
+            ttsJobId: "tts-job-1",
+            ttsUrl: null,
+            errorCode: null
+          }),
+          {
+            status: 202,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      if (input === "/api/tts/tts-job-1") {
+        return new Response(
+          JSON.stringify({
+            status: "failed",
+            ttsJobId: "tts-job-1",
+            ttsUrl: null,
+            errorCode: "tts_failed"
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${String(input)}`);
+    });
+
+    const view = renderHome();
+
+    clickByText("Test ASR");
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(view.textContent).toContain("The text reply should remain visible while TTS fails later.");
+    expect(view.textContent).toContain("TTS");
+    expect(view.textContent).toContain("failed");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tts",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("The text reply should remain visible while TTS fails later.")
+      })
+    );
+  });
+
   it("submits ASR userText to /api/chat and renders the structured response", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (input === "/api/asr") {
@@ -178,6 +289,10 @@ describe("home chat flow", () => {
         );
       }
 
+      if (input === "/api/tts") {
+        return createFallbackTtsResponse();
+      }
+
       throw new Error(`Unexpected fetch: ${String(input)}`);
     });
 
@@ -266,6 +381,10 @@ describe("home chat flow", () => {
           status: 200,
           headers: { "content-type": "application/json" }
         });
+      }
+
+      if (input === "/api/tts") {
+        return createFallbackTtsResponse();
       }
 
       throw new Error(`Unexpected fetch: ${String(input)}`);

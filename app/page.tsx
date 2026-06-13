@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, MessageSquareText, Mic2, Server } from "lucide-react";
+import { Camera, MessageSquareText, Mic2, Server, Volume2 } from "lucide-react";
 import React, { useRef, useState } from "react";
 
 import { CameraPreview, type CameraPreviewHandle } from "@/components/camera/CameraPreview";
@@ -9,6 +9,7 @@ import { VisualEvidence } from "@/components/chat/VisualEvidence";
 import { VoiceRecorder } from "@/components/recorder/VoiceRecorder";
 import type { SnapshotPayload } from "@/lib/client/camera";
 import type { ChatResponse } from "@/lib/contracts/chat";
+import type { TtsJobResponse } from "@/lib/contracts/tts";
 
 const statusItems = [
   { label: "Camera", value: "Preview ready", icon: Camera },
@@ -23,6 +24,7 @@ type ConversationTurn = {
   snapshot: SnapshotPayload | null;
   status: "submitting" | "ready" | "failed";
   response: ChatResponse | null;
+  tts: TtsJobResponse | null;
   failureReason: "vision_api_failed" | null;
 };
 
@@ -65,10 +67,91 @@ function CloudEvidence({ qiniu }: { qiniu: ChatResponse["qiniu"] }) {
   );
 }
 
+function TtsStatusPanel({ tts }: { tts: TtsJobResponse | null }) {
+  if (!tts) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3" role="status">
+      <div className="flex items-center gap-2">
+        <Volume2 className="h-4 w-4 text-signal" aria-hidden="true" />
+        <p className="text-xs font-medium uppercase text-slate-500">TTS</p>
+        <p className="text-sm font-semibold text-slate-800">{tts.status}</p>
+      </div>
+      {tts.status === "ready" && tts.ttsUrl ? (
+        <audio className="mt-3 w-full" controls src={tts.ttsUrl}>
+          <track kind="captions" />
+        </audio>
+      ) : null}
+      {tts.status === "fallback" ? (
+        <p className="mt-2 text-sm text-slate-600">Using browser SpeechSynthesis fallback.</p>
+      ) : null}
+      {tts.status === "failed" ? (
+        <p className="mt-2 text-sm text-rose-700">tts_failed. Text remains available and the next turn can continue.</p>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Home() {
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const sessionIdRef = useRef(`session-${Date.now()}`);
   const cameraPreviewRef = useRef<CameraPreviewHandle>(null);
+
+  function updateTurnTts(turnId: string, tts: TtsJobResponse) {
+    setTurns((currentTurns) => currentTurns.map((turn) => (turn.turnId === turnId ? { ...turn, tts } : turn)));
+  }
+
+  function speakWithBrowserFallback(text: string) {
+    const synthesis = globalThis.window?.speechSynthesis;
+
+    if (!synthesis || typeof SpeechSynthesisUtterance === "undefined") {
+      return;
+    }
+
+    synthesis.cancel();
+    synthesis.speak(new SpeechSynthesisUtterance(text));
+  }
+
+  async function startTts(turnId: string, response: ChatResponse) {
+    try {
+      const created = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sessionId: response.sessionId,
+          turnId: response.turnId,
+          replyText: response.replyText
+        })
+      });
+      const createdBody = (await created.json()) as TtsJobResponse;
+      updateTurnTts(turnId, createdBody);
+
+      if (createdBody.status === "fallback" || createdBody.status === "failed") {
+        speakWithBrowserFallback(response.replyText);
+        return;
+      }
+
+      if (createdBody.status === "pending" && createdBody.ttsJobId) {
+        const polled = await fetch(`/api/tts/${createdBody.ttsJobId}`);
+        const polledBody = (await polled.json()) as TtsJobResponse;
+        updateTurnTts(turnId, polledBody);
+
+        if (polledBody.status === "failed" || polledBody.status === "fallback") {
+          speakWithBrowserFallback(response.replyText);
+        }
+      }
+    } catch {
+      updateTurnTts(turnId, {
+        status: "failed",
+        ttsJobId: `tts-failed-${turnId}`,
+        ttsUrl: null,
+        errorCode: "tts_failed"
+      });
+      speakWithBrowserFallback(response.replyText);
+    }
+  }
 
   async function submitChat(userText: string) {
     const turnId = createTurnId();
@@ -84,6 +167,7 @@ export default function Home() {
         snapshot: snapshotForTurn,
         status: "submitting",
         response: null,
+        tts: null,
         failureReason: null
       }
     ]);
@@ -112,6 +196,7 @@ export default function Home() {
           turn.turnId === turnId ? { ...turn, status: "ready", response: body, failureReason: null } : turn
         )
       );
+      void startTts(turnId, body);
     } catch {
       setTurns((currentTurns) =>
         currentTurns.map((turn) =>
@@ -218,6 +303,7 @@ export default function Home() {
                         suggestedActions={turn.response.suggestedActions}
                       />
                       <CloudEvidence qiniu={turn.response.qiniu} />
+                      <TtsStatusPanel tts={turn.tts} />
                     </div>
                   ) : null}
                 </article>
