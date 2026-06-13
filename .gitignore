@@ -45,6 +45,7 @@ docs/ops/*
 !docs/ops/README.md
 !docs/ops/pr4-conversation-loop-handoff.md
 !docs/ops/pr5-storage-handoff.md
+!docs/ops/pr-submission-guidelines.md
 
 # Media and generated demo artifacts
 *.webm

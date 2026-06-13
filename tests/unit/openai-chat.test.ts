@@ -10,7 +10,7 @@ describe("OpenAI chat provider", () => {
 
   it("sends text and image content to OpenAI with structured JSON output", async () => {
     vi.stubEnv("AI_API_KEY", "test-key");
-    vi.stubEnv("AI_MODEL_MULTIMODAL", "gpt-4o-mini");
+    vi.stubEnv("AI_MODEL_MULTIMODAL", "qwen-vl-plus");
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -82,13 +82,72 @@ describe("OpenAI chat provider", () => {
       })
     );
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-    expect(body.model).toBe("gpt-4o-mini");
+    expect(body.model).toBe("qwen-vl-plus");
     expect(body.response_format.type).toBe("json_schema");
     expect(body.messages[1].content[1].image_url.url).toBe("data:image/webp;base64,abc123");
   });
 
+  it("uses an OpenAI-compatible base URL when configured", async () => {
+    vi.stubEnv("AI_API_KEY", "dashscope-key");
+    vi.stubEnv("AI_API_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1");
+    vi.stubEnv("AI_MODEL_MULTIMODAL", "qwen-vl-plus");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sessionId: "session-1",
+                  turnId: "turn-1",
+                  replyText: "Use the visible desk mood as the arrangement anchor.",
+                  visualObservation: {
+                    isUsable: true,
+                    summary: "A desk snapshot is visible",
+                    objects: ["desk"],
+                    sceneMood: "focused",
+                    motionEnergy: "low",
+                    confidence: 0.82,
+                    failureReason: null
+                  },
+                  musicSuggestion: {
+                    mood: "focused",
+                    tempo: "84 BPM",
+                    instruments: ["muted keys"],
+                    structure: "motif -> groove",
+                    promptForMusicGen: "focused muted keys"
+                  },
+                  followUpQuestion: null,
+                  suggestedActions: ["generate_music"]
+                })
+              }
+            }
+          ]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )
+    );
+
+    await createOpenAiChatProvider().complete({
+      sessionId: "session-1",
+      turnId: "turn-1",
+      userText: "Use the desk mood",
+      snapshot: null,
+      motionSignal: null,
+      historySummary: ""
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions");
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.model).toBe("qwen-vl-plus");
+  });
+
   it("rejects schema-invalid model output", async () => {
     vi.stubEnv("AI_API_KEY", "test-key");
+    vi.stubEnv("AI_MODEL_MULTIMODAL", "qwen-vl-plus");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -121,5 +180,20 @@ describe("OpenAI chat provider", () => {
         historySummary: ""
       })
     ).rejects.toThrow();
+  });
+
+  it("requires an explicitly configured multimodal model", async () => {
+    vi.stubEnv("AI_API_KEY", "test-key");
+
+    await expect(
+      createOpenAiChatProvider().complete({
+        sessionId: "session-1",
+        turnId: "turn-1",
+        userText: "Make it sparse",
+        snapshot: null,
+        motionSignal: null,
+        historySummary: ""
+      })
+    ).rejects.toThrow("AI_MODEL_MULTIMODAL is required");
   });
 });
