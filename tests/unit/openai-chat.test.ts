@@ -182,6 +182,55 @@ describe("OpenAI chat provider", () => {
     ).rejects.toThrow();
   });
 
+  it("includes provider response text when the compatible chat endpoint fails", async () => {
+    vi.stubEnv("AI_API_KEY", "test-key");
+    vi.stubEnv("AI_MODEL_MULTIMODAL", "qwen-vl-plus");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: "model unavailable" } }), {
+        status: 404,
+        headers: { "content-type": "application/json" }
+      })
+    );
+
+    await expect(
+      createOpenAiChatProvider().complete({
+        sessionId: "session-1",
+        turnId: "turn-1",
+        userText: "Make it sparse",
+        snapshot: null,
+        motionSignal: null,
+        historySummary: ""
+      })
+    ).rejects.toThrow("model unavailable");
+  });
+
+  it("reports non-JSON compatible chat content before schema validation", async () => {
+    vi.stubEnv("AI_API_KEY", "test-key");
+    vi.stubEnv("AI_MODEL_MULTIMODAL", "qwen-vl-plus");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "not json" } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )
+    );
+
+    await expect(
+      createOpenAiChatProvider().complete({
+        sessionId: "session-1",
+        turnId: "turn-1",
+        userText: "Make it sparse",
+        snapshot: null,
+        motionSignal: null,
+        historySummary: ""
+      })
+    ).rejects.toThrow("non-JSON content");
+  });
+
   it("requires an explicitly configured multimodal model", async () => {
     vi.stubEnv("AI_API_KEY", "test-key");
 

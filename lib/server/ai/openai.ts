@@ -9,7 +9,15 @@ const openAiChatResponseJsonSchema = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: ["sessionId", "turnId", "replyText", "visualObservation", "musicSuggestion", "followUpQuestion", "suggestedActions"],
+    required: [
+      "sessionId",
+      "turnId",
+      "replyText",
+      "visualObservation",
+      "musicSuggestion",
+      "followUpQuestion",
+      "suggestedActions"
+    ],
     properties: {
       sessionId: { type: "string" },
       turnId: { type: "string" },
@@ -17,7 +25,15 @@ const openAiChatResponseJsonSchema = {
       visualObservation: {
         type: "object",
         additionalProperties: false,
-        required: ["isUsable", "summary", "objects", "sceneMood", "motionEnergy", "confidence", "failureReason"],
+        required: [
+          "isUsable",
+          "summary",
+          "objects",
+          "sceneMood",
+          "motionEnergy",
+          "confidence",
+          "failureReason"
+        ],
         properties: {
           isUsable: { type: "boolean" },
           summary: { type: ["string", "null"] },
@@ -63,7 +79,9 @@ const openAiChatResponseJsonSchema = {
 };
 
 function chatCompletionsUrl() {
-  const baseUrl = process.env.AI_API_BASE_URL?.replace(/\/$/, "") || "https://api.openai.com/v1";
+  const baseUrl =
+    process.env.AI_API_BASE_URL?.replace(/\/$/, "") ||
+    "https://api.openai.com/v1";
 
   return `${baseUrl}/chat/completions`;
 }
@@ -97,6 +115,7 @@ function createMessageContent(input: Parameters<ChatProvider["complete"]>[0]) {
 export function createOpenAiChatProvider(): ChatProvider {
   return {
     name: "openai",
+
     async complete(input) {
       const apiKey = process.env.AI_API_KEY;
 
@@ -105,6 +124,7 @@ export function createOpenAiChatProvider(): ChatProvider {
       }
 
       const model = process.env.AI_MODEL_MULTIMODAL;
+
       if (!model) {
         throw new Error("AI_MODEL_MULTIMODAL is required for OpenAI-compatible chat");
       }
@@ -129,19 +149,30 @@ export function createOpenAiChatProvider(): ChatProvider {
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI chat failed with ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(
+          `OpenAI chat failed with ${response.status}: ${errorText}`
+        );
       }
 
       const body = (await response.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
       };
+
       const content = body.choices?.[0]?.message?.content;
 
       if (!content) {
-        throw new Error("OpenAI chat returned empty content");
+        throw new Error(`OpenAI chat returned empty content: ${JSON.stringify(body)}`);
       }
 
-      const parsed = JSON.parse(content) as ChatResponse;
+      let parsed: ChatResponse;
+
+      try {
+        parsed = JSON.parse(content) as ChatResponse;
+      } catch {
+        throw new Error(`OpenAI chat returned non-JSON content: ${content}`);
+      }
+
       return chatResponseSchema.parse({
         ...parsed,
         sessionId: input.sessionId,
