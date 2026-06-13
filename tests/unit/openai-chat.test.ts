@@ -145,6 +145,61 @@ describe("OpenAI chat provider", () => {
     expect(body.model).toBe("qwen-vl-plus");
   });
 
+  it("normalizes compatible model output into the Riff chat contract", async () => {
+    vi.stubEnv("AI_API_KEY", "test-key");
+    vi.stubEnv("AI_MODEL_MULTIMODAL", "qwen-vl-plus");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sessionId: "model-session",
+                  turnId: "model-turn",
+                  replyText: "The scene suggests a restrained pulse with glassy keys.",
+                  visualObservation: {
+                    isUsable: true,
+                    summary: "A dim desk setup is visible",
+                    objects: ["desk"],
+                    sceneMood: "dim and focused"
+                  },
+                  musicSuggestion: {
+                    mood: "restrained",
+                    tempo: "82 BPM",
+                    instruments: "glassy keys, sub bass"
+                  },
+                  suggestedActions: ["generate_music", "try softer drums"]
+                })
+              }
+            }
+          ]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )
+    );
+
+    const result = await createOpenAiChatProvider().complete({
+      sessionId: "session-1",
+      turnId: "turn-1",
+      userText: "Make this feel restrained",
+      snapshot: null,
+      motionSignal: null,
+      historySummary: ""
+    });
+
+    expect(result.sessionId).toBe("session-1");
+    expect(result.turnId).toBe("turn-1");
+    expect(result.visualObservation.confidence).toBe(0.7);
+    expect(result.visualObservation.failureReason).toBeNull();
+    expect(result.musicSuggestion.instruments).toEqual(["glassy keys", "sub bass"]);
+    expect(result.musicSuggestion.promptForMusicGen).toBe("restrained, 82 BPM, glassy keys, sub bass");
+    expect(result.suggestedActions).toEqual(["generate_music"]);
+  });
+
   it("rejects schema-invalid model output", async () => {
     vi.stubEnv("AI_API_KEY", "test-key");
     vi.stubEnv("AI_MODEL_MULTIMODAL", "qwen-vl-plus");
@@ -180,6 +235,55 @@ describe("OpenAI chat provider", () => {
         historySummary: ""
       })
     ).rejects.toThrow();
+  });
+
+  it("includes provider response text when the compatible chat endpoint fails", async () => {
+    vi.stubEnv("AI_API_KEY", "test-key");
+    vi.stubEnv("AI_MODEL_MULTIMODAL", "qwen-vl-plus");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: "model unavailable" } }), {
+        status: 404,
+        headers: { "content-type": "application/json" }
+      })
+    );
+
+    await expect(
+      createOpenAiChatProvider().complete({
+        sessionId: "session-1",
+        turnId: "turn-1",
+        userText: "Make it sparse",
+        snapshot: null,
+        motionSignal: null,
+        historySummary: ""
+      })
+    ).rejects.toThrow("model unavailable");
+  });
+
+  it("reports non-JSON compatible chat content before schema validation", async () => {
+    vi.stubEnv("AI_API_KEY", "test-key");
+    vi.stubEnv("AI_MODEL_MULTIMODAL", "qwen-vl-plus");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "not json" } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )
+    );
+
+    await expect(
+      createOpenAiChatProvider().complete({
+        sessionId: "session-1",
+        turnId: "turn-1",
+        userText: "Make it sparse",
+        snapshot: null,
+        motionSignal: null,
+        historySummary: ""
+      })
+    ).rejects.toThrow("non-JSON content");
   });
 
   it("requires an explicitly configured multimodal model", async () => {
