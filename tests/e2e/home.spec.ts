@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("home page shows the PR0 foundation regions", async ({ page }) => {
+test("home page shows the main workspace regions", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Riff" })).toBeVisible();

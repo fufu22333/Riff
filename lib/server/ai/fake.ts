@@ -3,7 +3,7 @@ import type { ChatRequest, ChatResponse } from "@/lib/contracts/chat";
 import type { ChatProvider } from "./provider";
 
 function hasSnapshot(input: ChatRequest) {
-  return Boolean(input.snapshot?.base64);
+  return Boolean(input.snapshot?.base64 || input.snapshotUrl);
 }
 
 export function createFakeChatProvider(): ChatProvider {

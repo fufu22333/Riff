@@ -68,7 +68,11 @@ function createMessageContent(input: Parameters<ChatProvider["complete"]>[0]) {
     text: buildRiffUserPrompt(input.userText, input.historySummary)
   };
 
-  if (!input.snapshot) {
+  const imageUrl = input.snapshot
+    ? `data:${input.snapshot.mimeType};base64,${input.snapshot.base64}`
+    : input.snapshotUrl;
+
+  if (!imageUrl) {
     return [textContent];
   }
 
@@ -77,7 +81,7 @@ function createMessageContent(input: Parameters<ChatProvider["complete"]>[0]) {
     {
       type: "image_url",
       image_url: {
-        url: `data:${input.snapshot.mimeType};base64,${input.snapshot.base64}`,
+        url: imageUrl,
         detail: "low"
       }
     }

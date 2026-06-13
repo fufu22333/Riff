@@ -20,6 +20,7 @@ export const chatRequestSchema = z.object({
   turnId: z.string().min(1),
   userText: z.string().trim().min(1),
   snapshot: snapshotSchema.optional().nullable(),
+  snapshotUrl: z.string().trim().url().optional().nullable(),
   motionSignal: motionSignalSchema.optional().nullable(),
   historySummary: z.string().max(4_000).optional().default("")
 });

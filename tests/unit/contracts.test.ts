@@ -50,6 +50,17 @@ describe("chat contracts", () => {
     expect(parsed.motionSignal?.energy).toBe("low");
   });
 
+  it("accepts a stored snapshot URL when base64 snapshot is not available", () => {
+    const parsed = chatRequestSchema.parse({
+      sessionId: "session-1",
+      turnId: "turn-1",
+      userText: "Use the saved desk snapshot for this turn",
+      snapshotUrl: "https://cdn.example.com/snapshots/session-1/turn-1.webp"
+    });
+
+    expect(parsed.snapshotUrl).toBe("https://cdn.example.com/snapshots/session-1/turn-1.webp");
+  });
+
   it("requires a failure reason when visual observation is unusable", () => {
     expect(() =>
       visualObservationSchema.parse({
@@ -110,5 +121,36 @@ describe("chat contracts", () => {
     });
 
     expect(parsed.visualObservation.failureReason).toBeNull();
+  });
+
+  it("rejects unsupported TTS status values", () => {
+    expect(() =>
+      chatResponseSchema.parse({
+        sessionId: "session-1",
+        turnId: "turn-1",
+        replyText: "Here is a grounded direction.",
+        visualObservation: {
+          isUsable: true,
+          summary: "A usable snapshot is present",
+          objects: ["snapshot"],
+          sceneMood: "focused",
+          motionEnergy: "low",
+          confidence: 0.8,
+          failureReason: null
+        },
+        musicSuggestion: {
+          mood: "quiet",
+          tempo: "78 BPM",
+          instruments: [],
+          structure: null,
+          promptForMusicGen: null
+        },
+        followUpQuestion: null,
+        suggestedActions: [],
+        tts: {
+          status: "queued"
+        }
+      })
+    ).toThrow();
   });
 });

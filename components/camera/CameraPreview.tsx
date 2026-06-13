@@ -14,7 +14,11 @@ function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
 }
 
-export function CameraPreview() {
+export type CameraPreviewProps = {
+  onSnapshot?: (snapshot: SnapshotPayload) => void;
+};
+
+export function CameraPreview({ onSnapshot }: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("idle");
@@ -77,6 +81,7 @@ export function CameraPreview() {
       setSnapshot(nextSnapshot);
       setSnapshotSent(true);
       setFailureReason(null);
+      onSnapshot?.(nextSnapshot);
     } catch {
       setFailureReason("snapshot_failed");
       setSnapshotSent(false);
