@@ -16,11 +16,13 @@ export const envSchema = z.object({
   MUSIC_PROVIDER: z.string().optional(),
   REPLICATE_API_TOKEN: z.string().optional(),
   MUSICGEN_MODEL: z.string().optional(),
+  STORAGE_PROVIDER: z.enum(["fake", "qiniu"]).default("fake"),
   QINIU_ACCESS_KEY: requiredText,
   QINIU_SECRET_KEY: requiredText,
   QINIU_BUCKET: requiredText,
   QINIU_REGION: requiredText,
   QINIU_PUBLIC_DOMAIN: z.string().trim().url(),
+  QINIU_UPLOAD_URL: z.string().trim().url().optional(),
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
   SPOTIFY_REDIRECT_URI: z.string().optional()

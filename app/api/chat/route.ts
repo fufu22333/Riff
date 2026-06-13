@@ -5,8 +5,13 @@ import { createFakeChatProvider } from "@/lib/server/ai/fake";
 import { createOpenAiChatProvider } from "@/lib/server/ai/openai";
 import type { ChatProvider } from "@/lib/server/ai/provider";
 import { createVisionFallbackResponse } from "@/lib/server/ai/provider";
+import { createFakeTurnStorage, persistCompletedTurn } from "@/lib/server/storage/provider";
+import { createQiniuTurnStorage } from "@/lib/server/storage/qiniu";
+import type { CompletedTurnStorageInput, StorageUrls, TurnStorage } from "@/lib/server/storage/provider";
 
 export const runtime = "nodejs";
+
+const fakeTurnStorage = createFakeTurnStorage();
 
 function jsonFailure(status: number, message: string) {
   return NextResponse.json({ failureReason: "vision_api_failed", message }, { status });
@@ -18,6 +23,29 @@ function getChatProvider(): ChatProvider {
   }
 
   return createFakeChatProvider();
+}
+
+function getTurnStorage(): TurnStorage {
+  if (process.env.STORAGE_PROVIDER === "qiniu") {
+    return createQiniuTurnStorage();
+  }
+
+  return fakeTurnStorage;
+}
+
+async function persistWithConfiguredStorage(input: CompletedTurnStorageInput): Promise<StorageUrls> {
+  try {
+    return await persistCompletedTurn(getTurnStorage(), input);
+  } catch (error) {
+    if (process.env.NODE_ENV !== "test") {
+      console.warn("Riff storage initialization failed", error);
+    }
+
+    return {
+      snapshotUrl: null,
+      turnJsonUrl: null
+    };
+  }
 }
 
 export async function POST(request: Request) {
@@ -38,8 +66,27 @@ export async function POST(request: Request) {
   try {
     const providerResponse = await getChatProvider().complete(parsedRequest.data);
     const validatedResponse = chatResponseSchema.parse(providerResponse);
-    return NextResponse.json(validatedResponse);
+    const qiniu = await persistWithConfiguredStorage({
+      request: parsedRequest.data,
+      response: validatedResponse
+    });
+    return NextResponse.json(
+      chatResponseSchema.parse({
+        ...validatedResponse,
+        qiniu
+      })
+    );
   } catch {
-    return NextResponse.json(chatResponseSchema.parse(createVisionFallbackResponse(parsedRequest.data)));
+    const fallbackResponse = chatResponseSchema.parse(createVisionFallbackResponse(parsedRequest.data));
+    const qiniu = await persistWithConfiguredStorage({
+      request: parsedRequest.data,
+      response: fallbackResponse
+    });
+    return NextResponse.json(
+      chatResponseSchema.parse({
+        ...fallbackResponse,
+        qiniu
+      })
+    );
   }
 }
