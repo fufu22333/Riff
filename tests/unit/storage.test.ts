@@ -94,6 +94,15 @@ describe("turn storage", () => {
     });
   });
 
+  it("uses the fake CDN default when QINIU_PUBLIC_DOMAIN is empty", async () => {
+    vi.stubEnv("QINIU_PUBLIC_DOMAIN", "");
+    const storage = createFakeTurnStorage();
+
+    expect(storage.publicUrl("turns/session-1/turn-1.json")).toBe(
+      "https://cdn.example.com/turns/session-1/turn-1.json"
+    );
+  });
+
   it("does not upload a snapshot when the submitted turn has no snapshot", async () => {
     const storage = createFakeTurnStorage("https://cdn.example.com");
 

@@ -122,9 +122,9 @@ export async function persistCompletedTurn(storage: TurnStorage, input: Complete
   }
 }
 
-export function createFakeTurnStorage(publicDomain = process.env.QINIU_PUBLIC_DOMAIN ?? "https://cdn.example.com"): TurnStorage {
+export function createFakeTurnStorage(publicDomain = process.env.QINIU_PUBLIC_DOMAIN): TurnStorage {
   const objects = new Map<string, unknown>();
-  const normalizedDomain = publicDomain.replace(/\/$/, "");
+  const normalizedDomain = (publicDomain?.trim() || "https://cdn.example.com").replace(/\/$/, "");
 
   return {
     async write(key, body) {
