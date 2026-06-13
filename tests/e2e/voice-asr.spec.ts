@@ -14,8 +14,9 @@ test("fake ASR returns userText and updates the conversation shell", async ({ pa
 
   await expect(page.getByText("userText")).toBeVisible();
   await expect(page.getByText("I want a lonely 3 AM streetlight feeling")).toHaveCount(2);
-  await expect(page.getByText("The visual signal is unavailable")).toBeVisible();
-  await expect(page.getByText("no_visual_subject")).toBeVisible();
+  await expect(page.getByText("Visual fallback")).toBeVisible();
+  await expect(page.getByText("Cloud evidence")).toBeVisible();
+  await expect(page.getByRole("link").filter({ hasText: "/turns/" })).toBeVisible();
 });
 
 test("records from the browser microphone APIs and submits the clip to ASR", async ({ page }) => {

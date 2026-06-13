@@ -7,3 +7,4 @@ for the product README.
 ## Current handoffs
 
 - [PR4 conversation loop handoff](./pr4-conversation-loop-handoff.md)
+- [PR5 storage handoff](./pr5-storage-handoff.md)
