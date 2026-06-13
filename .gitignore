@@ -9,6 +9,9 @@ out/
 dist/
 build/
 coverage/
+test-results/
+playwright-report/
+tsconfig.tsbuildinfo
 
 # Environment
 .env
@@ -34,6 +37,9 @@ Thumbs.db
 .codex_tmp/
 tmp/
 temp/
+
+# Local planning and competition documents
+docs/
 
 # Media and generated demo artifacts
 *.webm
