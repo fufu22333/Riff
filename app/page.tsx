@@ -1,7 +1,9 @@
 import { Camera, MessageSquareText, Mic2, Music2, Server } from "lucide-react";
 
+import { CameraPreview } from "@/components/camera/CameraPreview";
+
 const statusItems = [
-  { label: "Camera", value: "Placeholder", icon: Camera },
+  { label: "Camera", value: "Preview ready", icon: Camera },
   { label: "Mic / VAD", value: "Not connected", icon: Mic2 },
   { label: "Storage", value: "Server only", icon: Server }
 ];
@@ -29,23 +31,12 @@ export default function Home() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold">Camera workspace</h2>
-                <p className="mt-1 text-sm text-slate-600">Live preview and snapshot capture land in PR1.</p>
+                <p className="mt-1 text-sm text-slate-600">Live preview, permission fallback, and snapshot capture.</p>
               </div>
               <Camera className="h-6 w-6 text-signal" aria-hidden="true" />
             </div>
 
-            <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50">
-              <div className="max-w-sm px-6 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-signal shadow-sm">
-                  <Camera className="h-7 w-7" aria-hidden="true" />
-                </div>
-                <p className="mt-4 text-base font-medium">Preview placeholder</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  No real camera access in PR0. This region reserves stable layout for permission, preview, and
-                  snapshot states.
-                </p>
-              </div>
-            </div>
+            <CameraPreview />
           </section>
 
           <section
