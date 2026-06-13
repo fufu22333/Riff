@@ -38,6 +38,33 @@ function createHistorySummary(turns: ConversationTurn[]) {
     .join("\n\n");
 }
 
+function CloudEvidence({ qiniu }: { qiniu: ChatResponse["qiniu"] }) {
+  const hasSnapshotUrl = Boolean(qiniu?.snapshotUrl);
+  const hasTurnJsonUrl = Boolean(qiniu?.turnJsonUrl);
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-medium uppercase text-slate-500">Cloud evidence</p>
+      {hasSnapshotUrl || hasTurnJsonUrl ? (
+        <div className="mt-2 grid gap-2 text-sm">
+          {qiniu?.snapshotUrl ? (
+            <a className="break-all font-medium text-signal underline-offset-4 hover:underline" href={qiniu.snapshotUrl}>
+              {qiniu.snapshotUrl}
+            </a>
+          ) : null}
+          {qiniu?.turnJsonUrl ? (
+            <a className="break-all font-medium text-signal underline-offset-4 hover:underline" href={qiniu.turnJsonUrl}>
+              {qiniu.turnJsonUrl}
+            </a>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-slate-600">Storage evidence is unavailable for this turn.</p>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const sessionIdRef = useRef(`session-${Date.now()}`);
@@ -190,6 +217,7 @@ export default function Home() {
                         suggestion={turn.response.musicSuggestion}
                         suggestedActions={turn.response.suggestedActions}
                       />
+                      <CloudEvidence qiniu={turn.response.qiniu} />
                     </div>
                   ) : null}
                 </article>

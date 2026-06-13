@@ -76,7 +76,11 @@ describe("home chat flow", () => {
               promptForMusicGen: "midnight rain sparse felt piano"
             },
             followUpQuestion: "Can you show the lyric sheet?",
-            suggestedActions: ["generate_music"]
+            suggestedActions: ["generate_music"],
+            qiniu: {
+              snapshotUrl: "https://cdn.example.com/snapshots/session-1/turn-1.webp",
+              turnJsonUrl: "https://cdn.example.com/turns/session-1/turn-1.json"
+            }
           }),
           {
             status: 200,
@@ -113,6 +117,9 @@ describe("home chat flow", () => {
     expect(view.textContent).toContain("The voice-only scene can become a sparse midnight rain cue.");
     expect(view.textContent).toContain("no_visual_subject");
     expect(view.textContent).toContain("midnight rain");
+    expect(view.textContent).toContain("Cloud evidence");
+    expect(view.textContent).toContain("https://cdn.example.com/snapshots/session-1/turn-1.webp");
+    expect(view.textContent).toContain("https://cdn.example.com/turns/session-1/turn-1.json");
   });
 
   it("captures a fresh camera snapshot before submitting the chat turn", async () => {

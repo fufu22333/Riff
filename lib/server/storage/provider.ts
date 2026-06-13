@@ -39,6 +39,8 @@ const failedStorageUrls: StorageUrls = {
   turnJsonUrl: null
 };
 
+const sessionCache = new Map<string, StoredSession>();
+
 export function getStorageKeys(sessionId: string, turnId: string, assetId = turnId) {
   return {
     snapshot: `snapshots/${sessionId}/${turnId}.webp`,
@@ -98,7 +100,7 @@ export async function persistCompletedTurn(storage: TurnStorage, input: Complete
       "application/json"
     );
 
-    const existingSession = (await storage.readSession?.(storageKeys.sessionJson)) ?? null;
+    const existingSession = (await storage.readSession?.(storageKeys.sessionJson)) ?? sessionCache.get(sessionId) ?? null;
     const session = mergeTurnIntoSession(sessionId, existingSession, {
       turnId,
       userText: input.request.userText,
@@ -109,6 +111,7 @@ export async function persistCompletedTurn(storage: TurnStorage, input: Complete
     });
 
     await storage.write(storageKeys.sessionJson, toJsonBody(session), "application/json");
+    sessionCache.set(sessionId, session);
 
     return qiniu;
   } catch (error) {

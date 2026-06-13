@@ -50,6 +50,7 @@ function createStorageInput(overrides: Partial<CompletedTurnStorageInput> = {}):
 describe("turn storage", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("persists a completed turn with the submitted snapshot and merges it into session JSON", async () => {
@@ -155,5 +156,58 @@ describe("turn storage", () => {
       snapshotUrl: null,
       turnJsonUrl: null
     });
+  });
+
+  it("keeps prior session turns when storage readback misses the session JSON", async () => {
+    const uploadedSessions: Array<{ turns: Array<{ turnId: string }> }> = [];
+    const storage = {
+      async write(key: string, body: string | Uint8Array | Blob) {
+        if (key === "sessions/session-readback-miss.json" && typeof body === "string") {
+          uploadedSessions.push(JSON.parse(body));
+        }
+      },
+      publicUrl(key: string) {
+        return `https://cdn.example.com/${key}`;
+      },
+      async readSession() {
+        return null;
+      }
+    };
+
+    await persistCompletedTurn(
+      storage,
+      createStorageInput({
+        request: {
+          ...createStorageInput().request,
+          sessionId: "session-readback-miss",
+          turnId: "turn-1"
+        },
+        response: {
+          ...createStorageInput().response,
+          sessionId: "session-readback-miss",
+          turnId: "turn-1"
+        }
+      })
+    );
+    await persistCompletedTurn(
+      storage,
+      createStorageInput({
+        request: {
+          ...createStorageInput().request,
+          sessionId: "session-readback-miss",
+          turnId: "turn-2",
+          userText: "Now add brighter drums"
+        },
+        response: {
+          ...createStorageInput().response,
+          sessionId: "session-readback-miss",
+          turnId: "turn-2",
+          replyText: "Lift the second section with brighter drums."
+        }
+      })
+    );
+
+    expect(uploadedSessions).toHaveLength(2);
+    expect(uploadedSessions[1].turns.map((turn) => turn.turnId)).toEqual(["turn-1", "turn-2"]);
   });
 });
