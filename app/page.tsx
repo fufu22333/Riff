@@ -1,14 +1,20 @@
+"use client";
+
 import { Camera, MessageSquareText, Mic2, Music2, Server } from "lucide-react";
+import { useState } from "react";
 
 import { CameraPreview } from "@/components/camera/CameraPreview";
+import { VoiceRecorder } from "@/components/recorder/VoiceRecorder";
 
 const statusItems = [
   { label: "Camera", value: "Preview ready", icon: Camera },
-  { label: "Mic / VAD", value: "Not connected", icon: Mic2 },
+  { label: "Mic / VAD", value: "ASR ready", icon: Mic2 },
   { label: "Storage", value: "Server only", icon: Server }
 ];
 
 export default function Home() {
+  const [latestTranscript, setLatestTranscript] = useState("");
+
   return (
     <main className="min-h-screen bg-stage text-ink">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-4 px-5 py-5">
@@ -24,20 +30,24 @@ export default function Home() {
         </header>
 
         <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(380px,0.9fr)]">
-          <section
-            aria-label="Camera workspace"
-            className="flex min-h-[420px] flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold">Camera workspace</h2>
-                <p className="mt-1 text-sm text-slate-600">Live preview, permission fallback, and snapshot capture.</p>
+          <div className="flex flex-col gap-4">
+            <section
+              aria-label="Camera workspace"
+              className="flex min-h-[420px] flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold">Camera workspace</h2>
+                  <p className="mt-1 text-sm text-slate-600">Live preview, permission fallback, and snapshot capture.</p>
+                </div>
+                <Camera className="h-6 w-6 text-signal" aria-hidden="true" />
               </div>
-              <Camera className="h-6 w-6 text-signal" aria-hidden="true" />
-            </div>
 
-            <CameraPreview />
-          </section>
+              <CameraPreview />
+            </section>
+
+            <VoiceRecorder onTranscript={setLatestTranscript} />
+          </div>
 
           <section
             aria-label="Conversation workspace"
@@ -54,7 +64,9 @@ export default function Home() {
             <div className="flex flex-1 flex-col gap-3 p-4">
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-medium text-slate-500">User transcript</p>
-                <p className="mt-2 text-base text-slate-800">Waiting for ASR in PR2.</p>
+                <p className="mt-2 text-base text-slate-800">
+                  {latestTranscript || "Waiting for ASR input."}
+                </p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-white p-4">
                 <p className="text-sm font-medium text-slate-500">AI response</p>
