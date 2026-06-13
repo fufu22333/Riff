@@ -86,6 +86,52 @@ function chatCompletionsUrl() {
   return `${baseUrl}/chat/completions`;
 }
 
+function strictSystemPrompt() {
+  return (
+    buildRiffSystemPrompt() +
+    `
+
+Return ONLY valid JSON. Do not use markdown.
+
+The JSON object MUST match this exact structure:
+{
+  "sessionId": "string",
+  "turnId": "string",
+  "replyText": "string",
+  "visualObservation": {
+    "isUsable": true,
+    "summary": "string or null",
+    "objects": ["string"],
+    "sceneMood": "string or null",
+    "motionEnergy": "low or medium or high or null",
+    "confidence": 0.0,
+    "failureReason": null
+  },
+  "musicSuggestion": {
+    "mood": "string or null",
+    "tempo": "string or null",
+    "instruments": ["string"],
+    "structure": "string or null",
+    "promptForMusicGen": "string or null"
+  },
+  "followUpQuestion": "string or null",
+  "suggestedActions": ["generate_music"]
+}
+
+Rules:
+- visualObservation.objects must always be an array.
+- visualObservation.confidence must always be a number from 0 to 1.
+- visualObservation.motionEnergy must be "low", "medium", "high", or null.
+- If visualObservation.isUsable is true, failureReason must be null.
+- If visualObservation.isUsable is false, summary must be null and failureReason must be one of:
+  "no_camera_permission", "snapshot_failed", "snapshot_blurry", "too_dark", "no_visual_subject", "vision_api_failed", "asr_failed", "tts_failed", "music_generation_failed".
+- musicSuggestion.instruments must always be an array, never a string.
+- musicSuggestion.promptForMusicGen is required.
+- suggestedActions must be [] or ["generate_music"]. Do not put natural-language advice inside suggestedActions.
+- Put natural-language advice inside replyText, musicSuggestion, or followUpQuestion only.`
+  );
+}
+
 function createMessageContent(input: Parameters<ChatProvider["complete"]>[0]) {
   const textContent = {
     type: "text",
@@ -110,6 +156,68 @@ function createMessageContent(input: Parameters<ChatProvider["complete"]>[0]) {
       }
     }
   ];
+}
+
+type CompatibleModelChatResponse = Partial<Omit<ChatResponse, "musicSuggestion" | "visualObservation" | "suggestedActions">> & {
+  musicSuggestion?: Partial<Omit<ChatResponse["musicSuggestion"], "instruments">> & {
+    instruments?: unknown;
+  };
+  visualObservation?: Partial<ChatResponse["visualObservation"]>;
+  suggestedActions?: unknown[];
+};
+
+function normalizeChatResponse(raw: CompatibleModelChatResponse, input: Parameters<ChatProvider["complete"]>[0]) {
+  const instruments = raw.musicSuggestion?.instruments;
+
+  return chatResponseSchema.parse({
+    ...raw,
+    sessionId: input.sessionId,
+    turnId: input.turnId,
+    visualObservation: {
+      isUsable: raw.visualObservation?.isUsable ?? false,
+      summary: raw.visualObservation?.summary ?? null,
+      objects: Array.isArray(raw.visualObservation?.objects)
+        ? raw.visualObservation.objects
+        : [],
+      sceneMood: raw.visualObservation?.sceneMood ?? null,
+      motionEnergy: raw.visualObservation?.motionEnergy ?? null,
+      confidence:
+        typeof raw.visualObservation?.confidence === "number"
+          ? raw.visualObservation.confidence
+          : raw.visualObservation?.isUsable
+            ? 0.7
+            : 0,
+      failureReason:
+        raw.visualObservation?.isUsable
+          ? null
+          : raw.visualObservation?.failureReason ?? "vision_api_failed"
+    },
+    musicSuggestion: {
+      mood: raw.musicSuggestion?.mood ?? null,
+      tempo: raw.musicSuggestion?.tempo ?? null,
+      instruments: Array.isArray(instruments)
+        ? instruments
+        : typeof instruments === "string"
+          ? instruments.split(",").map((item) => item.trim()).filter(Boolean)
+          : [],
+      structure: raw.musicSuggestion?.structure ?? null,
+      promptForMusicGen:
+        raw.musicSuggestion?.promptForMusicGen ??
+        [
+          raw.musicSuggestion?.mood,
+          raw.musicSuggestion?.tempo,
+          Array.isArray(instruments) ? instruments.join(", ") : instruments,
+          raw.musicSuggestion?.structure
+        ]
+          .filter(Boolean)
+          .join(", ")
+    },
+    followUpQuestion: raw.followUpQuestion ?? null,
+    suggestedActions:
+      Array.isArray(raw.suggestedActions) && raw.suggestedActions.includes("generate_music")
+        ? ["generate_music"]
+        : []
+  });
 }
 
 export function createOpenAiChatProvider(): ChatProvider {
@@ -138,7 +246,7 @@ export function createOpenAiChatProvider(): ChatProvider {
         body: JSON.stringify({
           model,
           messages: [
-            { role: "system", content: buildRiffSystemPrompt() },
+            { role: "system", content: strictSystemPrompt() },
             { role: "user", content: createMessageContent(input) }
           ],
           response_format: {
@@ -165,19 +273,15 @@ export function createOpenAiChatProvider(): ChatProvider {
         throw new Error(`OpenAI chat returned empty content: ${JSON.stringify(body)}`);
       }
 
-      let parsed: ChatResponse;
+      let parsed: CompatibleModelChatResponse;
 
       try {
-        parsed = JSON.parse(content) as ChatResponse;
+        parsed = JSON.parse(content) as CompatibleModelChatResponse;
       } catch {
         throw new Error(`OpenAI chat returned non-JSON content: ${content}`);
       }
 
-      return chatResponseSchema.parse({
-        ...parsed,
-        sessionId: input.sessionId,
-        turnId: input.turnId
-      });
+      return normalizeChatResponse(parsed, input);
     }
   };
 }
