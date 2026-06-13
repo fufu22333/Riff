@@ -1,9 +1,11 @@
 "use client";
 
-import { Camera, MessageSquareText, Mic2, Music2, Server } from "lucide-react";
+import { Camera, MessageSquareText, Mic2, Server } from "lucide-react";
 import React, { useRef, useState } from "react";
 
-import { CameraPreview } from "@/components/camera/CameraPreview";
+import { CameraPreview, type CameraPreviewHandle } from "@/components/camera/CameraPreview";
+import { MusicSuggestionCard } from "@/components/chat/MusicSuggestionCard";
+import { VisualEvidence } from "@/components/chat/VisualEvidence";
 import { VoiceRecorder } from "@/components/recorder/VoiceRecorder";
 import type { SnapshotPayload } from "@/lib/client/camera";
 import type { ChatResponse } from "@/lib/contracts/chat";
@@ -14,21 +16,50 @@ const statusItems = [
   { label: "Storage", value: "Server only", icon: Server }
 ];
 
+type ConversationTurn = {
+  sessionId: string;
+  turnId: string;
+  userText: string;
+  snapshot: SnapshotPayload | null;
+  status: "submitting" | "ready" | "failed";
+  response: ChatResponse | null;
+  failureReason: "vision_api_failed" | null;
+};
+
+function createTurnId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `turn-${Date.now()}`;
+}
+
+function createHistorySummary(turns: ConversationTurn[]) {
+  return turns
+    .filter((turn) => turn.status === "ready" && turn.response)
+    .slice(-4)
+    .map((turn) => `User: ${turn.userText}\nRiff: ${turn.response?.replyText}`)
+    .join("\n\n");
+}
+
 export default function Home() {
-  const [latestTranscript, setLatestTranscript] = useState("");
-  const [latestSnapshot, setLatestSnapshot] = useState<SnapshotPayload | null>(null);
-  const [chatResponse, setChatResponse] = useState<ChatResponse | null>(null);
-  const [chatStatus, setChatStatus] = useState<"idle" | "submitting" | "ready" | "failed">("idle");
-  const [chatFailure, setChatFailure] = useState("");
+  const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const sessionIdRef = useRef(`session-${Date.now()}`);
+  const cameraPreviewRef = useRef<CameraPreviewHandle>(null);
 
   async function submitChat(userText: string) {
-    const turnId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `turn-${Date.now()}`;
+    const turnId = createTurnId();
+    const snapshotForTurn = cameraPreviewRef.current?.captureSnapshot() ?? null;
+    const historySummary = createHistorySummary(turns);
 
-    setLatestTranscript(userText);
-    setChatStatus("submitting");
-    setChatFailure("");
+    setTurns((currentTurns) => [
+      ...currentTurns,
+      {
+        sessionId: sessionIdRef.current,
+        turnId,
+        userText,
+        snapshot: snapshotForTurn,
+        status: "submitting",
+        response: null,
+        failureReason: null
+      }
+    ]);
 
     try {
       const response = await fetch("/api/chat", {
@@ -38,9 +69,9 @@ export default function Home() {
           sessionId: sessionIdRef.current,
           turnId,
           userText,
-          snapshot: latestSnapshot,
+          snapshot: snapshotForTurn,
           motionSignal: null,
-          historySummary: ""
+          historySummary
         })
       });
       const body = (await response.json()) as ChatResponse;
@@ -49,11 +80,19 @@ export default function Home() {
         throw new Error("Chat failed");
       }
 
-      setChatResponse(body);
-      setChatStatus("ready");
+      setTurns((currentTurns) =>
+        currentTurns.map((turn) =>
+          turn.turnId === turnId ? { ...turn, status: "ready", response: body, failureReason: null } : turn
+        )
+      );
     } catch {
-      setChatStatus("failed");
-      setChatFailure("vision_api_failed");
+      setTurns((currentTurns) =>
+        currentTurns.map((turn) =>
+          turn.turnId === turnId
+            ? { ...turn, status: "failed", response: null, failureReason: "vision_api_failed" }
+            : turn
+        )
+      );
     }
   }
 
@@ -84,7 +123,7 @@ export default function Home() {
                 <Camera className="h-6 w-6 text-signal" aria-hidden="true" />
               </div>
 
-              <CameraPreview onSnapshot={setLatestSnapshot} />
+              <CameraPreview ref={cameraPreviewRef} />
             </section>
 
             <VoiceRecorder onTranscript={(userText) => void submitChat(userText)} />
@@ -103,57 +142,58 @@ export default function Home() {
             </div>
 
             <div className="flex flex-1 flex-col gap-3 p-4">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-medium text-slate-500">User transcript</p>
-                <p className="mt-2 text-base text-slate-800">
-                  {latestTranscript || "Waiting for ASR input."}
-                </p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <p className="text-sm font-medium text-slate-500">AI response</p>
-                <p className="mt-2 text-base leading-6 text-slate-800">
-                  {chatStatus === "submitting"
-                    ? "Asking Riff for a structured visual music response."
-                    : chatStatus === "failed"
-                      ? "Chat failed; keep the transcript and try the next turn."
-                      : chatResponse?.replyText ||
-                        "The response will always include visual evidence or a clear visual failure reason."}
-                </p>
-              </div>
-              {chatResponse ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-medium text-slate-500">Visual evidence</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-800">
-                    {chatResponse.visualObservation.isUsable
-                      ? chatResponse.visualObservation.summary
-                      : chatResponse.visualObservation.failureReason}
+              {turns.length === 0 ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-medium text-slate-500">Waiting for ASR input</p>
+                  <p className="mt-2 text-base leading-6 text-slate-800">
+                    Each turn will keep the user transcript, AI reply, visual evidence, and music suggestion together.
                   </p>
                 </div>
               ) : null}
-              {chatFailure ? (
-                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="status">
-                  <span className="font-semibold">{chatFailure}</span>
-                  <span className="ml-2">The current turn stayed in transcript-only fallback.</span>
-                </div>
-              ) : null}
-              <div className="mt-auto rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
-                  <Music2 className="h-4 w-4" aria-hidden="true" />
-                  Music suggestion shell
-                </div>
-                <p className="mt-2 text-sm leading-6 text-amber-900">
-                  {chatResponse
-                    ? [
-                        chatResponse.musicSuggestion.mood,
-                        chatResponse.musicSuggestion.tempo,
-                        chatResponse.musicSuggestion.instruments.join(", "),
-                        chatResponse.musicSuggestion.structure
-                      ]
-                        .filter(Boolean)
-                        .join(" | ")
-                    : "Mood, tempo, instruments, and structure will render here after the first chat turn."}
-                </p>
-              </div>
+
+              {turns.map((turn, index) => (
+                <article key={turn.turnId} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-500">Turn {index + 1}</p>
+                    <p className="text-xs font-medium uppercase text-slate-500">{turn.status}</p>
+                  </div>
+
+                  <div className="mt-3 rounded-md bg-slate-50 px-3 py-3">
+                    <p className="text-xs font-medium uppercase text-slate-500">User transcript</p>
+                    <p className="mt-1 text-base text-slate-900">{turn.userText}</p>
+                  </div>
+
+                  {turn.status === "submitting" ? (
+                    <p className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                      Asking Riff for a structured visual music response.
+                    </p>
+                  ) : null}
+
+                  {turn.failureReason ? (
+                    <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="status">
+                      <span className="font-semibold">{turn.failureReason}</span>
+                      <span className="ml-2">The current turn stayed in transcript-only fallback.</span>
+                    </div>
+                  ) : null}
+
+                  {turn.response ? (
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div className="rounded-md border border-slate-200 bg-white p-3">
+                        <p className="text-xs font-medium uppercase text-slate-500">AI response</p>
+                        <p className="mt-2 text-base leading-6 text-slate-800">{turn.response.replyText}</p>
+                        {turn.response.followUpQuestion ? (
+                          <p className="mt-2 text-sm font-medium text-signal">{turn.response.followUpQuestion}</p>
+                        ) : null}
+                      </div>
+                      <VisualEvidence observation={turn.response.visualObservation} />
+                      <MusicSuggestionCard
+                        suggestion={turn.response.musicSuggestion}
+                        suggestedActions={turn.response.suggestedActions}
+                      />
+                    </div>
+                  ) : null}
+                </article>
+              ))}
             </div>
           </section>
         </div>
