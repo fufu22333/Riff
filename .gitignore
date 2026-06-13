@@ -35,6 +35,9 @@ Thumbs.db
 tmp/
 temp/
 
+# Local planning and competition documents
+docs/
+
 # Media and generated demo artifacts
 *.webm
 *.wav
