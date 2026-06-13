@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+
+import { envSchema, parseServerEnv } from "@/lib/server/env";
+
+describe("server environment validation", () => {
+  it("accepts the documented P0 provider configuration", () => {
+    const parsed = parseServerEnv({
+      AI_PROVIDER: "openai",
+      AI_API_KEY: "sk-test",
+      AI_MODEL_MULTIMODAL: "gpt-5.4-mini",
+      AI_MODEL_TEXT: "gpt-5.4-mini",
+      ASR_PROVIDER: "openai",
+      ASR_API_KEY: "sk-asr",
+      ASR_MODEL: "gpt-4o-mini-transcribe",
+      TTS_PROVIDER: "browser",
+      QINIU_ACCESS_KEY: "ak",
+      QINIU_SECRET_KEY: "sk",
+      QINIU_BUCKET: "riff",
+      QINIU_REGION: "z0",
+      QINIU_PUBLIC_DOMAIN: "https://cdn.example.com"
+    });
+
+    expect(parsed.AI_MODEL_MULTIMODAL).toBe("gpt-5.4-mini");
+    expect(parsed.TTS_PROVIDER).toBe("browser");
+  });
+
+  it("reports missing required P0 variables", () => {
+    const result = envSchema.safeParse({
+      AI_PROVIDER: "openai",
+      AI_MODEL_MULTIMODAL: "gpt-5.4-mini"
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
