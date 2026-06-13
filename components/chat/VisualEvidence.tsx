@@ -1,0 +1,62 @@
+"use client";
+
+import { AlertTriangle, Eye, Gauge } from "lucide-react";
+import React from "react";
+
+import type { VisualObservation } from "@/lib/contracts/chat";
+
+type VisualEvidenceProps = {
+  observation: VisualObservation;
+};
+
+function formatConfidence(confidence: number) {
+  return `${Math.round(confidence * 100)}%`;
+}
+
+export function VisualEvidence({ observation }: VisualEvidenceProps) {
+  const isLowConfidence = observation.isUsable && observation.confidence < 0.5;
+
+  return (
+    <section className="rounded-md border border-slate-200 bg-slate-50 p-3" aria-label="Visual evidence">
+      <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-800">
+        {observation.isUsable ? (
+          <Eye className="h-4 w-4 text-signal" aria-hidden="true" />
+        ) : (
+          <AlertTriangle className="h-4 w-4 text-amber-700" aria-hidden="true" />
+        )}
+        <span>{observation.isUsable ? "Visual evidence" : "Visual fallback"}</span>
+        {isLowConfidence ? (
+          <span className="rounded-sm bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
+            Low confidence
+          </span>
+        ) : null}
+      </div>
+
+      <p className="mt-2 text-sm leading-6 text-slate-800">
+        {observation.isUsable
+          ? observation.summary
+          : `${observation.failureReason} - Riff used a text-first fallback instead of inventing a scene.`}
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-700">
+        <span className="rounded-sm bg-white px-2 py-1 ring-1 ring-slate-200">
+          Confidence {formatConfidence(observation.confidence)}
+        </span>
+        {observation.sceneMood ? (
+          <span className="rounded-sm bg-white px-2 py-1 ring-1 ring-slate-200">{observation.sceneMood}</span>
+        ) : null}
+        {observation.motionEnergy ? (
+          <span className="inline-flex items-center gap-1 rounded-sm bg-white px-2 py-1 ring-1 ring-slate-200">
+            <Gauge className="h-3 w-3" aria-hidden="true" />
+            {observation.motionEnergy}
+          </span>
+        ) : null}
+        {observation.objects.map((object) => (
+          <span key={object} className="rounded-sm bg-white px-2 py-1 ring-1 ring-slate-200">
+            {object}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}

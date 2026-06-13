@@ -3,7 +3,7 @@
 import { Camera, CameraOff, ImagePlus, Power, Send } from "lucide-react";
 import Image from "next/image";
 import React from "react";
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import type { FailureCode } from "@/lib/contracts/failures";
 import { captureVideoSnapshot, type SnapshotPayload } from "@/lib/client/camera";
@@ -14,7 +14,18 @@ function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
 }
 
-export function CameraPreview() {
+export type CameraPreviewProps = {
+  onSnapshot?: (snapshot: SnapshotPayload) => void;
+};
+
+export type CameraPreviewHandle = {
+  captureSnapshot: () => SnapshotPayload | null;
+};
+
+export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>(function CameraPreview(
+  { onSnapshot },
+  ref
+) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("idle");
@@ -66,10 +77,14 @@ export function CameraPreview() {
     setStatus("idle");
   }
 
-  function captureSnapshot() {
+  const captureSnapshot = useCallback(() => {
+    if (status !== "ready") {
+      return null;
+    }
+
     if (!videoRef.current) {
       setFailureReason("snapshot_failed");
-      return;
+      return null;
     }
 
     try {
@@ -77,11 +92,16 @@ export function CameraPreview() {
       setSnapshot(nextSnapshot);
       setSnapshotSent(true);
       setFailureReason(null);
+      onSnapshot?.(nextSnapshot);
+      return nextSnapshot;
     } catch {
       setFailureReason("snapshot_failed");
       setSnapshotSent(false);
+      return null;
     }
-  }
+  }, [onSnapshot, status]);
+
+  useImperativeHandle(ref, () => ({ captureSnapshot }), [captureSnapshot]);
 
   const previewLabel =
     status === "ready" ? "Live camera preview" : status === "requesting" ? "Requesting camera" : "Camera is off";
@@ -169,7 +189,7 @@ export function CameraPreview() {
           />
           <div className="flex flex-col justify-center text-sm text-slate-700">
             <p className="font-semibold text-slate-900">
-              Snapshot ready · {snapshot.width}×{snapshot.height} · {snapshot.mimeType}
+              Snapshot ready - {snapshot.width}x{snapshot.height} - {snapshot.mimeType}
             </p>
             {snapshotSent ? (
               <p className="mt-2 inline-flex items-center gap-2 text-signal">
@@ -182,4 +202,4 @@ export function CameraPreview() {
       ) : null}
     </div>
   );
-}
+});
