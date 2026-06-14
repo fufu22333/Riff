@@ -12,7 +12,7 @@ test("fake ASR returns userText and updates the conversation shell", async ({ pa
 
   await page.getByRole("button", { name: "测试识别" }).click();
 
-  await expect(page.getByText("userText")).toBeVisible();
+  await expect(page.getByText("识别文本")).toBeVisible();
   await expect(page.getByText("I want a lonely 3 AM streetlight feeling")).toHaveCount(2);
   await expect(page.getByText("视觉不可用")).toBeVisible();
   await expect(page.getByText("云端记录")).toBeVisible();
@@ -23,11 +23,11 @@ test("records from the browser microphone APIs and submits the clip to ASR", asy
   await page.goto("/");
 
   await page.getByRole("button", { name: "开始说话" }).click();
-  await expect(page.getByText("Listening")).toBeVisible();
-  await expect(page.getByText("ASR state: recording")).toBeVisible();
+  await expect(page.getByText("正在听你说话")).toBeVisible();
+  await expect(page.getByText("语音识别：录音中")).toBeVisible();
 
   await page.getByRole("button", { name: "停止" }).click();
 
-  await expect(page.getByText("userText")).toBeVisible();
+  await expect(page.getByText("识别文本")).toBeVisible();
   await expect(page.getByText("I want a lonely 3 AM streetlight feeling")).toHaveCount(2);
 });

@@ -40,6 +40,7 @@ temp/
 
 # Local planning and competition documents
 docs/*
+!docs/design.md
 !docs/ops/
 docs/ops/*
 !docs/ops/README.md

@@ -9,8 +9,8 @@ test.use({
 test("camera denial shows the voice-only fallback state", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: "Start camera" }).click();
+  await page.getByRole("button", { name: "开启摄像头" }).click();
   await expect(page.getByText("no_camera_permission")).toBeVisible();
-  await expect(page.getByText("continuing in voice-only mode")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Capture snapshot" })).toBeDisabled();
+  await expect(page.getByText("可以继续纯语音模式")).toBeVisible();
+  await expect(page.getByRole("button", { name: "截取当前画面" })).toBeDisabled();
 });
