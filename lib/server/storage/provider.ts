@@ -17,6 +17,20 @@ export type StoredTurnSummary = {
   turnJsonUrl: string;
   replyText: string;
   createdAt: string;
+  generationJobId?: string;
+  musicUrl?: string;
+  generationStatus?: "ready" | "fallback_ready" | "failed";
+  usage?: "reference_only";
+};
+
+export type GenerationEvidenceInput = {
+  sessionId: string;
+  turnId: string;
+  generationJobId: string;
+  musicUrl: string;
+  generationStatus: "ready" | "fallback_ready" | "failed";
+  usage: "reference_only";
+  createdAt?: string;
 };
 
 export type StoredSession = {
@@ -31,7 +45,7 @@ export type TurnStorage = {
   write(key: string, body: StorageBody, contentType: string): Promise<void>;
   publicUrl(key: string): string;
   readSession?(key: string): Promise<StoredSession | null>;
-  readJson?(key: string): unknown;
+  readJson?(key: string): unknown | Promise<unknown>;
 };
 
 const failedStorageUrls: StorageUrls = {
@@ -41,12 +55,12 @@ const failedStorageUrls: StorageUrls = {
 
 const sessionCache = new Map<string, StoredSession>();
 
-export function getStorageKeys(sessionId: string, turnId: string, assetId = turnId) {
+export function getStorageKeys(sessionId: string, turnId: string, assetId = turnId, audioExtension: "mp3" | "wav" = "mp3") {
   return {
     snapshot: `snapshots/${sessionId}/${turnId}.webp`,
     turnJson: `turns/${sessionId}/${turnId}.json`,
     sessionJson: `sessions/${sessionId}.json`,
-    audio: `audio/${sessionId}/${assetId}.mp3`
+    audio: `audio/${sessionId}/${assetId}.${audioExtension}`
   };
 }
 
@@ -120,6 +134,81 @@ export async function persistCompletedTurn(storage: TurnStorage, input: Complete
     }
     return failedStorageUrls;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export async function persistGenerationEvidence(
+  storage: TurnStorage,
+  input: GenerationEvidenceInput
+): Promise<void> {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  const storageKeys = getStorageKeys(input.sessionId, input.turnId, input.generationJobId, "wav");
+  const generation = {
+    generationJobId: input.generationJobId,
+    musicUrl: input.musicUrl,
+    generationStatus: input.generationStatus,
+    usage: input.usage,
+    createdAt
+  };
+
+  const existingTurn = await storage.readJson?.(storageKeys.turnJson);
+  const nextTurn = isRecord(existingTurn)
+    ? {
+        ...existingTurn,
+        generation
+      }
+    : {
+        request: {
+          sessionId: input.sessionId,
+          turnId: input.turnId
+        },
+        generation,
+        createdAt
+      };
+
+  await storage.write(storageKeys.turnJson, toJsonBody(nextTurn), "application/json");
+
+  const existingSession =
+    (await storage.readSession?.(storageKeys.sessionJson)) ?? sessionCache.get(input.sessionId) ?? null;
+  const existingTurns = existingSession?.turns ?? [];
+  const nextTurns = existingTurns.map((turn) =>
+    turn.turnId === input.turnId
+      ? {
+          ...turn,
+          generationJobId: input.generationJobId,
+          musicUrl: input.musicUrl,
+          generationStatus: input.generationStatus,
+          usage: input.usage
+        }
+      : turn
+  );
+  const session: StoredSession = {
+    sessionId: existingSession?.sessionId ?? input.sessionId,
+    updatedAt: createdAt,
+    turns: nextTurns.some((turn) => turn.turnId === input.turnId)
+      ? nextTurns
+      : [
+          ...nextTurns,
+          {
+            turnId: input.turnId,
+            userText: "",
+            snapshotUrl: null,
+            turnJsonUrl: storage.publicUrl(storageKeys.turnJson),
+            replyText: "",
+            createdAt,
+            generationJobId: input.generationJobId,
+            musicUrl: input.musicUrl,
+            generationStatus: input.generationStatus,
+            usage: input.usage
+          }
+        ]
+  };
+
+  await storage.write(storageKeys.sessionJson, toJsonBody(session), "application/json");
+  sessionCache.set(input.sessionId, session);
 }
 
 export function createFakeTurnStorage(publicDomain = process.env.QINIU_PUBLIC_DOMAIN): TurnStorage {

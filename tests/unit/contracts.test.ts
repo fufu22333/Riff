@@ -7,6 +7,7 @@ import {
   visualObservationSchema
 } from "@/lib/contracts/chat";
 import { failureCodes, isFailureCode } from "@/lib/contracts/failures";
+import { generateCreateRequestSchema, generateJobResponseSchema } from "@/lib/contracts/generate";
 
 describe("failure contracts", () => {
   it("exposes the visual and workflow failure codes used by the PRD", () => {
@@ -150,6 +151,107 @@ describe("chat contracts", () => {
         tts: {
           status: "queued"
         }
+      })
+    ).toThrow();
+  });
+});
+
+describe("music generation contracts", () => {
+  it("accepts the PR8 generation request shape", () => {
+    const parsed = generateCreateRequestSchema.parse({
+      sessionId: "session-1",
+      turnId: "turn-1",
+      promptForMusicGen: "midnight rain sparse felt piano"
+    });
+
+    expect(parsed.promptForMusicGen).toBe("midnight rain sparse felt piano");
+  });
+
+  it("accepts async generation job states and playable fallback samples", () => {
+    expect(
+      generateJobResponseSchema.parse({
+        status: "queued",
+        jobId: "music-job-1",
+        musicUrl: null,
+        errorCode: null,
+        usage: "reference_only",
+        isExportable: false
+      }).status
+    ).toBe("queued");
+
+    expect(
+      generateJobResponseSchema.parse({
+        status: "fallback_ready",
+        jobId: "music-job-2",
+        musicUrl: "https://cdn.example.com/audio/session-1/music-job-2.mp3",
+        errorCode: "music_generation_failed",
+        usage: "reference_only",
+        isExportable: false
+      }).musicUrl
+    ).toContain("music-job-2.mp3");
+  });
+
+  it("requires ready generation jobs to include a music URL", () => {
+    expect(() =>
+      generateJobResponseSchema.parse({
+        status: "ready",
+        jobId: "music-job-3",
+        musicUrl: null,
+        errorCode: null,
+        usage: "reference_only",
+        isExportable: false
+      })
+    ).toThrow(/musicUrl/);
+  });
+
+  it("requires fallback-ready generation jobs to include the playable reference URL", () => {
+    expect(() =>
+      generateJobResponseSchema.parse({
+        status: "fallback_ready",
+        jobId: "music-job-4",
+        musicUrl: null,
+        errorCode: "music_generation_failed",
+        usage: "reference_only",
+        isExportable: false
+      })
+    ).toThrow(/musicUrl/);
+  });
+
+  it("requires generation responses to stay reference-only and non-exportable", () => {
+    const parsed = generateJobResponseSchema.parse({
+      status: "ready",
+      jobId: "music-job-5",
+      musicUrl: "https://cdn.example.com/audio/session-1/music-job-5.mp3",
+      errorCode: null,
+      usage: "reference_only",
+      isExportable: false
+    });
+
+    expect(parsed.usage).toBe("reference_only");
+    expect(parsed.isExportable).toBe(false);
+  });
+
+  it("rejects export-oriented fields on generation responses", () => {
+    expect(() =>
+      generateJobResponseSchema.parse({
+        status: "ready",
+        jobId: "music-job-6",
+        musicUrl: "https://cdn.example.com/audio/session-1/music-job-6.mp3",
+        downloadUrl: "https://cdn.example.com/audio/session-1/music-job-6.mp3?download=1",
+        errorCode: null,
+        usage: "reference_only",
+        isExportable: false
+      })
+    ).toThrow(/downloadUrl/);
+
+    expect(() =>
+      generateJobResponseSchema.parse({
+        status: "fallback",
+        jobId: "music-job-7",
+        musicUrl: "https://cdn.example.com/audio/session-1/music-job-7.mp3",
+        errorCode: "music_generation_failed",
+        usage: "reference_only",
+        isExportable: false
       })
     ).toThrow();
   });

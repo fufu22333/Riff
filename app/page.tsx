@@ -9,6 +9,7 @@ import { VisualEvidence } from "@/components/chat/VisualEvidence";
 import { VoiceRecorder } from "@/components/recorder/VoiceRecorder";
 import type { SnapshotPayload } from "@/lib/client/camera";
 import type { ChatResponse } from "@/lib/contracts/chat";
+import type { GenerateJobResponse } from "@/lib/contracts/generate";
 import type { TtsJobResponse } from "@/lib/contracts/tts";
 
 const statusItems = [
@@ -25,6 +26,7 @@ type ConversationTurn = {
   status: "submitting" | "ready" | "failed";
   response: ChatResponse | null;
   tts: TtsJobResponse | null;
+  generation: GenerateJobResponse | null;
   failureReason: "vision_api_failed" | null;
 };
 
@@ -94,6 +96,42 @@ function TtsStatusPanel({ tts }: { tts: TtsJobResponse | null }) {
   );
 }
 
+function ReferenceTrackPanel({ generation }: { generation: GenerateJobResponse | null }) {
+  if (!generation) {
+    return null;
+  }
+
+  const playableUrl = generation.musicUrl;
+  const urlSource = playableUrl?.includes("cdn.example.com") || playableUrl?.includes("qiniu") ? "CDN URL" : "playable URL";
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3" role="status">
+      <div className="flex items-center gap-2">
+        <Volume2 className="h-4 w-4 text-signal" aria-hidden="true" />
+        <p className="text-xs font-medium uppercase text-slate-500">Reference track</p>
+        <p className="text-sm font-semibold text-slate-800">{generation.status}</p>
+        <p className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+          reference-only
+        </p>
+      </div>
+      <p className="mt-2 text-sm text-slate-600">Creative reference only, not exportable.</p>
+      {playableUrl ? (
+        <>
+          <audio className="mt-3 w-full" controls controlsList="nodownload" src={playableUrl}>
+            <track kind="captions" />
+          </audio>
+          <p className="mt-2 break-all text-xs text-slate-500">Source: {urlSource} · {playableUrl}</p>
+        </>
+      ) : null}
+      {generation.errorCode ? (
+        <p className="mt-2 text-sm text-rose-700">
+          {generation.errorCode}. A pregenerated sample remains available when generation cannot finish.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Home() {
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const sessionIdRef = useRef(`session-${Date.now()}`);
@@ -101,6 +139,12 @@ export default function Home() {
 
   function updateTurnTts(turnId: string, tts: TtsJobResponse) {
     setTurns((currentTurns) => currentTurns.map((turn) => (turn.turnId === turnId ? { ...turn, tts } : turn)));
+  }
+
+  function updateTurnGeneration(turnId: string, generation: GenerateJobResponse) {
+    setTurns((currentTurns) =>
+      currentTurns.map((turn) => (turn.turnId === turnId ? { ...turn, generation } : turn))
+    );
   }
 
   function speakWithBrowserFallback(text: string) {
@@ -153,6 +197,41 @@ export default function Home() {
     }
   }
 
+  async function startMusicGeneration(turn: ConversationTurn) {
+    if (!turn.response?.musicSuggestion.promptForMusicGen) {
+      return;
+    }
+
+    try {
+      const created = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sessionId: turn.response.sessionId,
+          turnId: turn.response.turnId,
+          promptForMusicGen: turn.response.musicSuggestion.promptForMusicGen
+        })
+      });
+      const createdBody = (await created.json()) as GenerateJobResponse;
+      updateTurnGeneration(turn.turnId, createdBody);
+
+      if (createdBody.status === "queued" || createdBody.status === "processing") {
+        const polled = await fetch(`/api/generate/${createdBody.jobId}`);
+        const polledBody = (await polled.json()) as GenerateJobResponse;
+        updateTurnGeneration(turn.turnId, polledBody);
+      }
+    } catch {
+      updateTurnGeneration(turn.turnId, {
+        status: "failed",
+        jobId: `music-failed-${turn.turnId}`,
+        musicUrl: null,
+        errorCode: "music_generation_failed",
+        usage: "reference_only",
+        isExportable: false
+      });
+    }
+  }
+
   async function submitChat(userText: string) {
     const turnId = createTurnId();
     const snapshotForTurn = cameraPreviewRef.current?.captureSnapshot() ?? null;
@@ -168,6 +247,7 @@ export default function Home() {
         status: "submitting",
         response: null,
         tts: null,
+        generation: null,
         failureReason: null
       }
     ]);
@@ -301,7 +381,12 @@ export default function Home() {
                       <MusicSuggestionCard
                         suggestion={turn.response.musicSuggestion}
                         suggestedActions={turn.response.suggestedActions}
+                        onGenerateMusic={() => void startMusicGeneration(turn)}
+                        isGenerating={
+                          turn.generation?.status === "queued" || turn.generation?.status === "processing"
+                        }
                       />
+                      <ReferenceTrackPanel generation={turn.generation} />
                       <CloudEvidence qiniu={turn.response.qiniu} />
                       <TtsStatusPanel tts={turn.tts} />
                     </div>

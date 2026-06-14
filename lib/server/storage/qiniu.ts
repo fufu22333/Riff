@@ -87,6 +87,17 @@ export function createQiniuTurnStorage(): TurnStorage {
       }
 
       return (await response.json()) as StoredSession;
+    },
+    async readJson(key) {
+      const response = await fetch(`${publicDomain}/${key}`, {
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return response.json();
     }
   };
 }

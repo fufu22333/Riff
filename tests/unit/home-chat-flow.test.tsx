@@ -33,6 +33,14 @@ function clickByText(text: string) {
   });
 }
 
+function expectNoExportActions() {
+  const interactiveLabels = Array.from(document.querySelectorAll("button, a"))
+    .map((candidate) => candidate.textContent ?? "")
+    .join(" ");
+
+  expect(interactiveLabels).not.toMatch(/download|export|copy link/i);
+}
+
 function createFallbackTtsResponse() {
   return new Response(
     JSON.stringify({
@@ -59,6 +67,212 @@ afterEach(() => {
 });
 
 describe("home chat flow", () => {
+  it("creates a reference track job from a suggested action and renders the playable result", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/api/asr") {
+        return new Response(JSON.stringify({ userText: "Generate a short midnight rain reference", provider: "fake" }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
+      if (input === "/api/chat") {
+        return new Response(
+          JSON.stringify({
+            sessionId: "session-1",
+            turnId: "turn-1",
+            replyText: "That can become a sparse late-night reference cue.",
+            visualObservation: {
+              isUsable: false,
+              summary: null,
+              objects: [],
+              sceneMood: null,
+              motionEnergy: null,
+              confidence: 0,
+              failureReason: "no_visual_subject"
+            },
+            musicSuggestion: {
+              mood: "midnight rain",
+              tempo: "74 BPM",
+              instruments: ["felt piano", "soft pad"],
+              structure: "quiet intro -> pulse",
+              promptForMusicGen: "midnight rain sparse felt piano"
+            },
+            followUpQuestion: "Want a reference clip?",
+            suggestedActions: ["generate_music"]
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      if (input === "/api/tts") {
+        return createFallbackTtsResponse();
+      }
+
+      if (input === "/api/generate") {
+        return new Response(
+          JSON.stringify({
+            status: "queued",
+            jobId: "music-job-1",
+            musicUrl: null,
+            errorCode: null,
+            usage: "reference_only",
+            isExportable: false
+          }),
+          {
+            status: 202,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      if (input === "/api/generate/music-job-1") {
+        return new Response(
+          JSON.stringify({
+            status: "ready",
+            jobId: "music-job-1",
+            musicUrl: "https://cdn.example.com/audio/session-1/music-job-1.wav",
+            errorCode: null,
+            usage: "reference_only",
+            isExportable: false
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${String(input)}`);
+    });
+
+    const view = renderHome();
+
+    clickByText("Test ASR");
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    clickByText("Generate music");
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/generate",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("midnight rain sparse felt piano")
+      })
+    );
+    expect(view.textContent).toContain("Reference track");
+    expect(view.textContent).toContain("ready");
+    expect(view.textContent).toContain("reference-only");
+    expect(view.textContent).toContain("Creative reference only, not exportable");
+    expectNoExportActions();
+    expect(view.querySelector("audio")?.getAttribute("src")).toBe(
+      "https://cdn.example.com/audio/session-1/music-job-1.wav"
+    );
+    expect(view.querySelector("audio")?.getAttribute("controlsList")).toBe("nodownload");
+  });
+
+  it("renders fallback-ready reference tracks as non-exportable playable audio", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/api/asr") {
+        return new Response(JSON.stringify({ userText: "Generate a fallback reference", provider: "fake" }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
+      if (input === "/api/chat") {
+        return new Response(
+          JSON.stringify({
+            sessionId: "session-1",
+            turnId: "turn-1",
+            replyText: "A fallback reference sample can still demonstrate the direction.",
+            visualObservation: {
+              isUsable: false,
+              summary: null,
+              objects: [],
+              sceneMood: null,
+              motionEnergy: null,
+              confidence: 0,
+              failureReason: "no_visual_subject"
+            },
+            musicSuggestion: {
+              mood: "midnight rain",
+              tempo: "74 BPM",
+              instruments: ["felt piano", "soft pad"],
+              structure: "quiet intro -> pulse",
+              promptForMusicGen: "midnight rain sparse felt piano"
+            },
+            followUpQuestion: "Want a fallback reference clip?",
+            suggestedActions: ["generate_music"]
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      if (input === "/api/tts") {
+        return createFallbackTtsResponse();
+      }
+
+      if (input === "/api/generate") {
+        return new Response(
+          JSON.stringify({
+            status: "fallback_ready",
+            jobId: "music-job-fallback",
+            musicUrl: "https://cdn.example.com/audio/session-1/music-job-fallback.wav",
+            errorCode: "music_generation_failed",
+            usage: "reference_only",
+            isExportable: false
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      throw new Error(`Unexpected fetch: ${String(input)}`);
+    });
+
+    const view = renderHome();
+
+    clickByText("Test ASR");
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    clickByText("Generate music");
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(view.textContent).toContain("fallback_ready");
+    expect(view.textContent).toContain("reference-only");
+    expect(view.textContent).toContain("Creative reference only, not exportable");
+    expectNoExportActions();
+    expect(view.querySelector("audio")?.getAttribute("src")).toBe(
+      "https://cdn.example.com/audio/session-1/music-job-fallback.wav"
+    );
+    expect(view.querySelector("audio")?.getAttribute("controlsList")).toBe("nodownload");
+  });
+
   it("shows the chat reply before surfacing async TTS failure state", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (input === "/api/asr") {

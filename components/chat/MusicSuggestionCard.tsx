@@ -8,6 +8,8 @@ import type { ChatResponse, MusicSuggestion } from "@/lib/contracts/chat";
 type MusicSuggestionCardProps = {
   suggestion: MusicSuggestion;
   suggestedActions?: ChatResponse["suggestedActions"];
+  onGenerateMusic?: () => void;
+  isGenerating?: boolean;
 };
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -23,7 +25,12 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function MusicSuggestionCard({ suggestion, suggestedActions = [] }: MusicSuggestionCardProps) {
+export function MusicSuggestionCard({
+  suggestion,
+  suggestedActions = [],
+  onGenerateMusic,
+  isGenerating = false
+}: MusicSuggestionCardProps) {
   return (
     <section className="rounded-md border border-amber-200 bg-amber-50 p-3" aria-label="Music suggestion">
       <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
@@ -47,10 +54,12 @@ export function MusicSuggestionCard({ suggestion, suggestedActions = [] }: Music
       {suggestedActions.includes("generate_music") ? (
         <button
           type="button"
+          onClick={onGenerateMusic}
+          disabled={isGenerating || !onGenerateMusic}
           className="mt-3 inline-flex items-center gap-2 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950"
         >
           <Wand2 className="h-4 w-4" aria-hidden="true" />
-          Generate music
+          {isGenerating ? "Generating" : "Generate music"}
         </button>
       ) : null}
     </section>
