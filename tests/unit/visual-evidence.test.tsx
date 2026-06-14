@@ -60,7 +60,7 @@ describe("VisualEvidence", () => {
     });
 
     expect(view.textContent).toContain("no_visual_subject");
-    expect(view.textContent).toContain("Riff used a text-first fallback");
+    expect(view.textContent).toContain("Riff 没有编造画面");
   });
 
   it("labels low confidence usable observations", () => {
@@ -74,7 +74,7 @@ describe("VisualEvidence", () => {
       failureReason: null
     });
 
-    expect(view.textContent).toContain("Low confidence");
+    expect(view.textContent).toContain("置信度较低");
     expect(view.textContent).toContain("34%");
   });
 });

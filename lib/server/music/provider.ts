@@ -1,4 +1,5 @@
 import type { GenerateCreateRequest, GenerateJobResponse, GenerateStatus } from "@/lib/contracts/generate";
+import { fallbackSampleAudioContentType, readFallbackSampleAudio } from "@/lib/server/music/fallbackSample";
 import { getStorageKeys, persistGenerationEvidence, type TurnStorage } from "@/lib/server/storage/provider";
 
 type MusicJob = {
@@ -71,7 +72,7 @@ async function persistReferenceTrack(
   body: Uint8Array
 ) {
   const audioKey = getStorageKeys(request.sessionId, request.turnId, jobId, "wav").audio;
-  await storage.write(audioKey, body, "audio/wav");
+  await storage.write(audioKey, body, fallbackSampleAudioContentType);
 
   const musicUrl = storage.publicUrl(audioKey);
   await persistGenerationEvidence(storage, {
@@ -94,7 +95,7 @@ export async function createMusicGenerationJob(
 
   if (!isMusicProviderAvailable()) {
     try {
-      const musicUrl = await persistReferenceTrack(storage, request, jobId, "fallback_ready", createSilentWav());
+      const musicUrl = await persistReferenceTrack(storage, request, jobId, "fallback_ready", await readFallbackSampleAudio());
       return createResponse("fallback_ready", jobId, musicUrl);
     } catch {
       return createResponse("failed", jobId);
@@ -134,7 +135,13 @@ export async function resolveMusicGenerationJob(
     job.response = createResponse("ready", jobId, musicUrl);
   } catch {
     try {
-      const musicUrl = await persistReferenceTrack(storage, job.request, jobId, "fallback_ready", createSilentWav());
+      const musicUrl = await persistReferenceTrack(
+        storage,
+        job.request,
+        jobId,
+        "fallback_ready",
+        await readFallbackSampleAudio()
+      );
       job.response = createResponse("fallback_ready", jobId, musicUrl);
     } catch {
       job.response = createResponse("failed", jobId);

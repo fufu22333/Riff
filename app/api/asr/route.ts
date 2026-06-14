@@ -38,7 +38,9 @@ export async function POST(request: Request) {
     const filename = audio instanceof File ? audio.name : "audio.webm";
     const result = await getAsrProvider().transcribe({ audio, filename });
     return NextResponse.json(asrSuccessSchema.parse(result));
-  } catch {
-    return jsonFailure(502, "ASR provider failed");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "ASR provider failed";
+    console.error("[asr] provider failed", message);
+    return jsonFailure(502, process.env.NODE_ENV === "production" ? "ASR provider failed" : message);
   }
 }

@@ -12,6 +12,7 @@ describe("server environment validation", () => {
       AI_MODEL_TEXT: "qwen-plus",
       ASR_PROVIDER: "openai",
       ASR_API_KEY: "sk-asr",
+      ASR_API_BASE_URL: "https://api.siliconflow.cn/v1",
       ASR_MODEL: "gpt-4o-mini-transcribe",
       TTS_PROVIDER: "browser",
       QINIU_ACCESS_KEY: "ak",
@@ -22,6 +23,7 @@ describe("server environment validation", () => {
     });
 
     expect(parsed.AI_API_BASE_URL).toBe("https://dashscope.aliyuncs.com/compatible-mode/v1");
+    expect(parsed.ASR_API_BASE_URL).toBe("https://api.siliconflow.cn/v1");
     expect(parsed.AI_MODEL_MULTIMODAL).toBe("qwen-vl-plus");
     expect(parsed.TTS_PROVIDER).toBe("browser");
   });

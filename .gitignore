@@ -50,6 +50,8 @@ docs/ops/*
 # Media and generated demo artifacts
 *.webm
 *.wav
+!public/audio/fallback-sample.wav
+!public/audio/test-asr.wav
 *.mp3
 *.mp4
 *.mov

@@ -44,6 +44,47 @@ afterEach(() => {
 });
 
 describe("VoiceRecorder", () => {
+  it("uses a real wav sample for the default ASR test clip", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/audio/test-asr.wav") {
+        return new Response("RIFF test wav", {
+          status: 200,
+          headers: { "content-type": "audio/wav" }
+        });
+      }
+
+      return new Response(JSON.stringify({ userText: "Test ASR works", provider: "openai" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+
+    const view = render(<VoiceRecorder onTranscript={() => undefined} />);
+
+    clickByText("测试识别");
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(view.textContent).toContain("Test ASR works");
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/audio/test-asr.wav");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/asr",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.any(FormData)
+      })
+    );
+    const body = fetchMock.mock.calls[1][1]?.body as FormData;
+    const audio = body.get("audio") as File;
+    expect(audio.name).toBe("test-asr.wav");
+    expect(audio.type).toBe("audio/wav");
+  });
+
   it("submits a test audio blob and displays returned userText", async () => {
     const onTranscript = vi.fn();
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -60,7 +101,7 @@ describe("VoiceRecorder", () => {
       />
     );
 
-    clickByText("Test ASR");
+    clickByText("测试识别");
 
     await act(async () => {
       await Promise.resolve();
@@ -86,7 +127,7 @@ describe("VoiceRecorder", () => {
       />
     );
 
-    clickByText("Test ASR");
+    clickByText("测试识别");
 
     await act(async () => {
       await Promise.resolve();
@@ -94,31 +135,18 @@ describe("VoiceRecorder", () => {
     });
 
     expect(view.textContent).toContain("asr_failed");
-    expect(view.textContent).toContain("Record again");
+    expect(view.textContent).toContain("重新说");
   });
 
   it("stops microphone tracks and closes the audio context when recording stops", async () => {
     const trackStop = vi.fn();
     const audioContextClose = vi.fn();
 
-    class MockMediaRecorder {
-      mimeType = "audio/webm";
-      ondataavailable: ((event: { data: Blob }) => void) | null = null;
-      onstop: (() => void) | null = null;
-
-      constructor(public stream: MediaStream) {}
-
-      start() {}
-
-      stop() {
-        this.ondataavailable?.({ data: new Blob(["recorded audio"], { type: "audio/webm" }) });
-        this.onstop?.();
-      }
-    }
-
     class MockAudioContext {
+      sampleRate = 16_000;
+
       createMediaStreamSource() {
-        return { connect: vi.fn() };
+        return { connect: vi.fn(), disconnect: vi.fn() };
       }
 
       createAnalyser() {
@@ -128,10 +156,17 @@ describe("VoiceRecorder", () => {
         };
       }
 
+      createScriptProcessor() {
+        return {
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          onaudioprocess: null
+        };
+      }
+
       close = audioContextClose;
     }
 
-    vi.stubGlobal("MediaRecorder", MockMediaRecorder);
     vi.stubGlobal("AudioContext", MockAudioContext);
     vi.spyOn(globalThis, "requestAnimationFrame").mockReturnValue(1);
     vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation(() => undefined);
@@ -151,14 +186,14 @@ describe("VoiceRecorder", () => {
 
     render(<VoiceRecorder onTranscript={() => undefined} />);
 
-    clickByText("Start voice");
+    clickByText("开始说话");
 
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    clickByText("Stop voice");
+    clickByText("停止");
 
     await act(async () => {
       await Promise.resolve();

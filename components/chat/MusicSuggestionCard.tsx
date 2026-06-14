@@ -32,17 +32,17 @@ export function MusicSuggestionCard({
   isGenerating = false
 }: MusicSuggestionCardProps) {
   return (
-    <section className="rounded-md border border-amber-200 bg-amber-50 p-3" aria-label="Music suggestion">
+    <section className="rounded-md border border-amber-200 bg-amber-50 p-3" aria-label="音乐建议">
       <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
         <Music2 className="h-4 w-4" aria-hidden="true" />
-        Music suggestion
+        音乐建议
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Field label="Mood" value={suggestion.mood} />
-        <Field label="Tempo" value={suggestion.tempo} />
-        <Field label="Instruments" value={suggestion.instruments.join(", ")} />
-        <Field label="Structure" value={suggestion.structure} />
+        <Field label="情绪" value={suggestion.mood} />
+        <Field label="速度" value={suggestion.tempo} />
+        <Field label="乐器" value={suggestion.instruments.join("、")} />
+        <Field label="结构" value={suggestion.structure} />
       </div>
 
       {suggestion.promptForMusicGen ? (
@@ -59,7 +59,7 @@ export function MusicSuggestionCard({
           className="mt-3 inline-flex items-center gap-2 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950"
         >
           <Wand2 className="h-4 w-4" aria-hidden="true" />
-          {isGenerating ? "Generating" : "Generate music"}
+          {isGenerating ? "生成中" : "生成音乐"}
         </button>
       ) : null}
     </section>

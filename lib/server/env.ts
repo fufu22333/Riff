@@ -10,6 +10,7 @@ export const envSchema = z.object({
   AI_MODEL_TEXT: requiredText.default("qwen-plus"),
   ASR_PROVIDER: z.enum(["openai", "fake"]).default("openai"),
   ASR_API_KEY: requiredText,
+  ASR_API_BASE_URL: z.string().trim().url().optional(),
   ASR_MODEL: requiredText,
   TTS_PROVIDER: z.enum(["browser", "openai", "fake"]).default("browser"),
   TTS_API_KEY: z.string().optional(),

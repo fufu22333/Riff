@@ -36,7 +36,7 @@ describe("chat provider", () => {
 
     expect(prompt).toContain("visualObservation");
     expect(prompt).toContain("failureReason");
-    expect(prompt).toContain("Do not invent visual details");
+    expect(prompt).toContain("不要编造画面细节");
     expect(prompt).toContain("musicSuggestion");
   });
 });

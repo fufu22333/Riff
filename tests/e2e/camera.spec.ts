@@ -10,14 +10,14 @@ test.use({
 test("camera can start, capture a compressed snapshot, and stop", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: "Start camera" }).click();
+  await page.getByRole("button", { name: "开启摄像头" }).click();
   await expect(page.getByLabel("Live camera preview")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Capture snapshot" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "截取当前画面" })).toBeEnabled();
 
-  await page.getByRole("button", { name: "Capture snapshot" }).click();
+  await page.getByRole("button", { name: "截取当前画面" }).click();
   await expect(page.getByText("Snapshot ready")).toBeVisible();
   await expect(page.getByText("Sent to AI observation")).toBeVisible();
 
-  await page.getByRole("button", { name: "Stop camera" }).click();
-  await expect(page.getByText("Camera is off")).toBeVisible();
+  await page.getByRole("button", { name: "关闭摄像头" }).click();
+  await expect(page.getByText("摄像头未开启")).toBeVisible();
 });

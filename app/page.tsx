@@ -13,9 +13,9 @@ import type { GenerateJobResponse } from "@/lib/contracts/generate";
 import type { TtsJobResponse } from "@/lib/contracts/tts";
 
 const statusItems = [
-  { label: "Camera", value: "Preview ready", icon: Camera },
-  { label: "Mic / VAD", value: "ASR ready", icon: Mic2 },
-  { label: "Storage", value: "Server only", icon: Server }
+  { label: "摄像头", value: "可预览", icon: Camera },
+  { label: "麦克风", value: "可识别", icon: Mic2 },
+  { label: "存储", value: "服务端", icon: Server }
 ];
 
 type ConversationTurn = {
@@ -38,8 +38,20 @@ function createHistorySummary(turns: ConversationTurn[]) {
   return turns
     .filter((turn) => turn.status === "ready" && turn.response)
     .slice(-4)
-    .map((turn) => `User: ${turn.userText}\nRiff: ${turn.response?.replyText}`)
+    .map((turn) => `用户：${turn.userText}\nRiff：${turn.response?.replyText}`)
     .join("\n\n");
+}
+
+function formatTurnStatus(status: ConversationTurn["status"]) {
+  if (status === "submitting") {
+    return "理解中";
+  }
+
+  if (status === "ready") {
+    return "已完成";
+  }
+
+  return "失败";
 }
 
 function CloudEvidence({ qiniu }: { qiniu: ChatResponse["qiniu"] }) {
@@ -48,7 +60,7 @@ function CloudEvidence({ qiniu }: { qiniu: ChatResponse["qiniu"] }) {
 
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs font-medium uppercase text-slate-500">Cloud evidence</p>
+      <p className="text-xs font-medium uppercase text-slate-500">云端记录</p>
       {hasSnapshotUrl || hasTurnJsonUrl ? (
         <div className="mt-2 grid gap-2 text-sm">
           {qiniu?.snapshotUrl ? (
@@ -63,7 +75,7 @@ function CloudEvidence({ qiniu }: { qiniu: ChatResponse["qiniu"] }) {
           ) : null}
         </div>
       ) : (
-        <p className="mt-2 text-sm text-slate-600">Storage evidence is unavailable for this turn.</p>
+        <p className="mt-2 text-sm text-slate-600">这一轮没有可用的云端记录。</p>
       )}
     </div>
   );
@@ -87,10 +99,10 @@ function TtsStatusPanel({ tts }: { tts: TtsJobResponse | null }) {
         </audio>
       ) : null}
       {tts.status === "fallback" ? (
-        <p className="mt-2 text-sm text-slate-600">Using browser SpeechSynthesis fallback.</p>
+        <p className="mt-2 text-sm text-slate-600">正在使用浏览器自带朗读。</p>
       ) : null}
       {tts.status === "failed" ? (
-        <p className="mt-2 text-sm text-rose-700">tts_failed. Text remains available and the next turn can continue.</p>
+        <p className="mt-2 text-sm text-rose-700">语音朗读失败，但文字回复保留，你可以继续下一轮。</p>
       ) : null}
     </div>
   );
@@ -102,19 +114,19 @@ function ReferenceTrackPanel({ generation }: { generation: GenerateJobResponse |
   }
 
   const playableUrl = generation.musicUrl;
-  const urlSource = playableUrl?.includes("cdn.example.com") || playableUrl?.includes("qiniu") ? "CDN URL" : "playable URL";
+  const urlSource = playableUrl?.includes("cdn.example.com") || playableUrl?.includes("qiniu") ? "CDN 地址" : "可播放地址";
 
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50 p-3" role="status">
       <div className="flex items-center gap-2">
         <Volume2 className="h-4 w-4 text-signal" aria-hidden="true" />
-        <p className="text-xs font-medium uppercase text-slate-500">Reference track</p>
+        <p className="text-xs font-medium uppercase text-slate-500">参考音频</p>
         <p className="text-sm font-semibold text-slate-800">{generation.status}</p>
         <p className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
-          reference-only
+          仅供参考
         </p>
       </div>
-      <p className="mt-2 text-sm text-slate-600">Creative reference only, not exportable.</p>
+      <p className="mt-2 text-sm text-slate-600">当前不是完整可商用生成，只是本地/兜底参考音频。</p>
       {playableUrl ? (
         <>
           <audio className="mt-3 w-full" controls controlsList="nodownload" src={playableUrl}>
@@ -125,7 +137,7 @@ function ReferenceTrackPanel({ generation }: { generation: GenerateJobResponse |
       ) : null}
       {generation.errorCode ? (
         <p className="mt-2 text-sm text-rose-700">
-          {generation.errorCode}. A pregenerated sample remains available when generation cannot finish.
+          真实音乐生成未完成或未配置。当前播放的是预置兜底样例，不代表已经真正生成了一首歌。
         </p>
       ) : null}
     </div>
@@ -293,24 +305,24 @@ export default function Home() {
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-4 px-5 py-5">
         <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-signal">Visual music partner</p>
+            <p className="text-sm font-medium uppercase tracking-wide text-signal">视觉音乐伙伴</p>
             <h1 className="mt-1 text-4xl font-semibold">Riff</h1>
           </div>
           <p className="max-w-2xl text-sm leading-6 text-slate-600">
-            Capture a visual scene, speak a creative intent, and send both into a structured music conversation turn.
+            打开摄像头，说出你的想法，Riff 会结合画面和语音与你讨论音乐方向。
           </p>
         </header>
 
         <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(380px,0.9fr)]">
           <div className="flex flex-col gap-4">
             <section
-              aria-label="Camera workspace"
+              aria-label="摄像头区域"
               className="flex min-h-[420px] flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold">Camera workspace</h2>
-                  <p className="mt-1 text-sm text-slate-600">Live preview, permission fallback, and snapshot capture.</p>
+                  <h2 className="text-xl font-semibold">摄像头</h2>
+                  <p className="mt-1 text-sm text-slate-600">实时预览，并在每次对话时截取当前画面给 AI。</p>
                 </div>
                 <Camera className="h-6 w-6 text-signal" aria-hidden="true" />
               </div>
@@ -322,13 +334,13 @@ export default function Home() {
           </div>
 
           <section
-            aria-label="Conversation workspace"
+            aria-label="对话区域"
             className="flex min-h-[420px] flex-col rounded-lg border border-slate-200 bg-white shadow-sm"
           >
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-4">
               <div>
-                <h2 className="text-xl font-semibold">Conversation workspace</h2>
-                <p className="mt-1 text-sm text-slate-600">ASR transcripts now submit to structured visual music replies.</p>
+                <h2 className="text-xl font-semibold">对话</h2>
+                <p className="mt-1 text-sm text-slate-600">你的语音会转成文字，并和当前画面一起发送给 AI。</p>
               </div>
               <MessageSquareText className="h-6 w-6 text-signal" aria-hidden="true" />
             </div>
@@ -336,9 +348,9 @@ export default function Home() {
             <div className="flex flex-1 flex-col gap-3 p-4">
               {turns.length === 0 ? (
                 <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-medium text-slate-500">Waiting for ASR input</p>
+                  <p className="text-sm font-medium text-slate-500">等待你说话</p>
                   <p className="mt-2 text-base leading-6 text-slate-800">
-                    Each turn will keep the user transcript, AI reply, visual evidence, and music suggestion together.
+                    每一轮都会显示你的语音文本、AI 回复、它看到的画面依据，以及音乐建议。
                   </p>
                 </div>
               ) : null}
@@ -346,32 +358,32 @@ export default function Home() {
               {turns.map((turn, index) => (
                 <article key={turn.turnId} className="rounded-lg border border-slate-200 bg-white p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-500">Turn {index + 1}</p>
-                    <p className="text-xs font-medium uppercase text-slate-500">{turn.status}</p>
+                    <p className="text-sm font-semibold text-slate-500">第 {index + 1} 轮</p>
+                    <p className="text-xs font-medium uppercase text-slate-500">{formatTurnStatus(turn.status)}</p>
                   </div>
 
                   <div className="mt-3 rounded-md bg-slate-50 px-3 py-3">
-                    <p className="text-xs font-medium uppercase text-slate-500">User transcript</p>
+                    <p className="text-xs font-medium uppercase text-slate-500">你说的话</p>
                     <p className="mt-1 text-base text-slate-900">{turn.userText}</p>
                   </div>
 
                   {turn.status === "submitting" ? (
                     <p className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
-                      Asking Riff for a structured visual music response.
+                      正在把语音和当前画面发给 Riff 理解。
                     </p>
                   ) : null}
 
                   {turn.failureReason ? (
                     <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="status">
                       <span className="font-semibold">{turn.failureReason}</span>
-                      <span className="ml-2">The current turn stayed in transcript-only fallback.</span>
+                      <span className="ml-2">这一轮没有拿到完整视觉回复，只保留文字兜底。</span>
                     </div>
                   ) : null}
 
                   {turn.response ? (
                     <div className="mt-3 flex flex-col gap-3">
                       <div className="rounded-md border border-slate-200 bg-white p-3">
-                        <p className="text-xs font-medium uppercase text-slate-500">AI response</p>
+                        <p className="text-xs font-medium uppercase text-slate-500">AI 回复</p>
                         <p className="mt-2 text-base leading-6 text-slate-800">{turn.response.replyText}</p>
                         {turn.response.followUpQuestion ? (
                           <p className="mt-2 text-sm font-medium text-signal">{turn.response.followUpQuestion}</p>

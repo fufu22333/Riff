@@ -47,8 +47,8 @@ describe("CameraPreview", () => {
   it("starts in an inactive camera state", () => {
     const view = render(<CameraPreview />);
 
-    expect(view.textContent).toContain("Camera is off");
-    expect(view.textContent).toContain("Start camera");
+    expect(view.textContent).toContain("摄像头未开启");
+    expect(view.textContent).toContain("开启摄像头");
   });
 
   it("shows no_camera_permission when camera access is denied", async () => {
@@ -60,13 +60,13 @@ describe("CameraPreview", () => {
     });
 
     const view = render(<CameraPreview />);
-    clickByText("Start camera");
+    clickByText("开启摄像头");
 
     await act(async () => {
       await Promise.resolve();
     });
 
     expect(view.textContent).toContain("no_camera_permission");
-    expect(view.textContent).toContain("voice-only mode");
+    expect(view.textContent).toContain("纯语音模式");
   });
 });

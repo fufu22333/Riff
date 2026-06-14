@@ -1,5 +1,13 @@
 import type { AsrProvider } from "./provider";
 
+function audioTranscriptionsUrl() {
+  const baseUrl =
+    process.env.ASR_API_BASE_URL?.replace(/\/$/, "") ||
+    "https://api.openai.com/v1";
+
+  return `${baseUrl}/audio/transcriptions`;
+}
+
 export function createOpenAiAsrProvider(): AsrProvider {
   return {
     name: "openai",
@@ -14,7 +22,7 @@ export function createOpenAiAsrProvider(): AsrProvider {
       formData.set("file", audio, filename);
       formData.set("model", process.env.ASR_MODEL || "gpt-4o-mini-transcribe");
 
-      const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      const response = await fetch(audioTranscriptionsUrl(), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`
@@ -23,7 +31,8 @@ export function createOpenAiAsrProvider(): AsrProvider {
       });
 
       if (!response.ok) {
-        throw new Error(`OpenAI ASR failed with ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`OpenAI ASR failed with ${response.status}: ${errorText}`);
       }
 
       const body = (await response.json()) as { text?: string };

@@ -40,6 +40,36 @@ describe("OpenAI ASR provider", () => {
     expect(body.get("file")).toBeInstanceOf(Blob);
   });
 
+  it("supports SiliconFlow's OpenAI-compatible transcription endpoint", async () => {
+    vi.stubEnv("ASR_API_KEY", "siliconflow-key");
+    vi.stubEnv("ASR_API_BASE_URL", "https://api.siliconflow.cn/v1");
+    vi.stubEnv("ASR_MODEL", "FunAudioLLM/SenseVoiceSmall");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ text: "Add warm analog drums under the hook" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })
+    );
+
+    const result = await createOpenAiAsrProvider().transcribe({
+      audio: new Blob(["voice"], { type: "audio/webm" }),
+      filename: "turn.webm"
+    });
+
+    expect(result.userText).toBe("Add warm analog drums under the hook");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.siliconflow.cn/v1/audio/transcriptions",
+      expect.objectContaining({
+        method: "POST",
+        headers: { Authorization: "Bearer siliconflow-key" },
+        body: expect.any(FormData)
+      })
+    );
+    const body = fetchMock.mock.calls[0][1]?.body as FormData;
+    expect(body.get("model")).toBe("FunAudioLLM/SenseVoiceSmall");
+    expect(body.get("file")).toBeInstanceOf(Blob);
+  });
+
   it("rejects empty transcription text", async () => {
     vi.stubEnv("ASR_API_KEY", "test-key");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(

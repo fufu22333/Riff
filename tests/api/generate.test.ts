@@ -1,12 +1,27 @@
 // @vitest-environment node
 
+import { existsSync, statSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "@/app/api/generate/route";
 import { GET } from "@/app/api/generate/[jobId]/route";
 import { GET as GET_SAMPLE } from "@/app/api/generate/sample/route";
 import { generateJobResponseSchema } from "@/lib/contracts/generate";
+import { fallbackSampleAudioPath } from "@/lib/server/music/fallbackSample";
+import { createMusicGenerationJob } from "@/lib/server/music/provider";
 import { createFakeTurnStorage, persistCompletedTurn } from "@/lib/server/storage/provider";
+
+function wavHasAudiblePcmData(bytes: Uint8Array) {
+  const dataOffset = 44;
+
+  for (let offset = dataOffset; offset + 1 < bytes.length; offset += 2) {
+    if ((bytes[offset] ?? 0) !== 0 || (bytes[offset + 1] ?? 0) !== 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 async function postGenerate(overrides: Record<string, unknown> = {}) {
   return POST(
@@ -83,6 +98,25 @@ describe("music generation API", () => {
       isExportable: false
     });
     expect(body.musicUrl).toMatch(/\.wav$/);
+  });
+
+  it("stores the pregenerated fallback sample when the provider is unavailable", async () => {
+    vi.stubEnv("MUSIC_PROVIDER", "disabled");
+
+    const storage = createFakeTurnStorage("https://cdn.example.com");
+    const response = await createMusicGenerationJob(
+      {
+        sessionId: "session-1",
+        turnId: "turn-1",
+        promptForMusicGen: "midnight rain sparse felt piano"
+      },
+      storage
+    );
+
+    const storedAudio = storage.readJson?.(`audio/session-1/${response.jobId}.wav`);
+    expect(response.status).toBe("fallback_ready");
+    expect(storedAudio).toBeInstanceOf(Uint8Array);
+    expect(wavHasAudiblePcmData(storedAudio as Uint8Array)).toBe(true);
   });
 
   it("falls back to a stored playable reference sample when generation fails", async () => {
@@ -191,9 +225,17 @@ describe("music generation API", () => {
 
   it("serves the pregenerated fallback sample as browser-playable audio", async () => {
     const response = await GET_SAMPLE();
+    const bytes = new Uint8Array(await response.arrayBuffer());
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("audio/wav");
-    expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(40);
+    expect(bytes.byteLength).toBeGreaterThan(44);
+    expect(wavHasAudiblePcmData(bytes)).toBe(true);
+  });
+
+  it("keeps the pregenerated fallback sample on disk with audio content", () => {
+    expect(fallbackSampleAudioPath).toContain("public");
+    expect(existsSync(fallbackSampleAudioPath)).toBe(true);
+    expect(statSync(fallbackSampleAudioPath).size).toBeGreaterThan(44);
   });
 });

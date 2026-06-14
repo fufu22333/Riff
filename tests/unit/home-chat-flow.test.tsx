@@ -56,6 +56,13 @@ function createFallbackTtsResponse() {
   );
 }
 
+function createTestAsrAudioResponse() {
+  return new Response("RIFF test wav", {
+    status: 200,
+    headers: { "content-type": "audio/wav" }
+  });
+}
+
 afterEach(() => {
   act(() => {
     root?.unmount();
@@ -69,6 +76,10 @@ afterEach(() => {
 describe("home chat flow", () => {
   it("creates a reference track job from a suggested action and renders the playable result", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/audio/test-asr.wav") {
+        return createTestAsrAudioResponse();
+      }
+
       if (input === "/api/asr") {
         return new Response(JSON.stringify({ userText: "Generate a short midnight rain reference", provider: "fake" }), {
           status: 200,
@@ -151,14 +162,14 @@ describe("home chat flow", () => {
 
     const view = renderHome();
 
-    clickByText("Test ASR");
+    clickByText("测试识别");
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    clickByText("Generate music");
+    clickByText("生成音乐");
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -172,10 +183,10 @@ describe("home chat flow", () => {
         body: expect.stringContaining("midnight rain sparse felt piano")
       })
     );
-    expect(view.textContent).toContain("Reference track");
+    expect(view.textContent).toContain("参考音频");
     expect(view.textContent).toContain("ready");
-    expect(view.textContent).toContain("reference-only");
-    expect(view.textContent).toContain("Creative reference only, not exportable");
+    expect(view.textContent).toContain("仅供参考");
+    expect(view.textContent).toContain("当前不是完整可商用生成，只是本地/兜底参考音频");
     expectNoExportActions();
     expect(view.querySelector("audio")?.getAttribute("src")).toBe(
       "https://cdn.example.com/audio/session-1/music-job-1.wav"
@@ -185,6 +196,10 @@ describe("home chat flow", () => {
 
   it("renders fallback-ready reference tracks as non-exportable playable audio", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/audio/test-asr.wav") {
+        return createTestAsrAudioResponse();
+      }
+
       if (input === "/api/asr") {
         return new Response(JSON.stringify({ userText: "Generate a fallback reference", provider: "fake" }), {
           status: 200,
@@ -250,22 +265,22 @@ describe("home chat flow", () => {
 
     const view = renderHome();
 
-    clickByText("Test ASR");
+    clickByText("测试识别");
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    clickByText("Generate music");
+    clickByText("生成音乐");
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
 
     expect(view.textContent).toContain("fallback_ready");
-    expect(view.textContent).toContain("reference-only");
-    expect(view.textContent).toContain("Creative reference only, not exportable");
+    expect(view.textContent).toContain("仅供参考");
+    expect(view.textContent).toContain("当前不是完整可商用生成，只是本地/兜底参考音频");
     expectNoExportActions();
     expect(view.querySelector("audio")?.getAttribute("src")).toBe(
       "https://cdn.example.com/audio/session-1/music-job-fallback.wav"
@@ -275,6 +290,10 @@ describe("home chat flow", () => {
 
   it("shows the chat reply before surfacing async TTS failure state", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/audio/test-asr.wav") {
+        return createTestAsrAudioResponse();
+      }
+
       if (input === "/api/asr") {
         return new Response(JSON.stringify({ userText: "Make it feel like midnight rain", provider: "fake" }), {
           status: 200,
@@ -349,7 +368,7 @@ describe("home chat flow", () => {
 
     const view = renderHome();
 
-    clickByText("Test ASR");
+    clickByText("测试识别");
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -371,6 +390,10 @@ describe("home chat flow", () => {
 
   it("submits ASR userText to /api/chat and renders the structured response", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/audio/test-asr.wav") {
+        return createTestAsrAudioResponse();
+      }
+
       if (input === "/api/asr") {
         return new Response(JSON.stringify({ userText: "Make it feel like midnight rain", provider: "fake" }), {
           status: 200,
@@ -419,7 +442,7 @@ describe("home chat flow", () => {
 
     const view = renderHome();
 
-    clickByText("Test ASR");
+    clickByText("测试识别");
 
     await act(async () => {
       await Promise.resolve();
@@ -442,7 +465,7 @@ describe("home chat flow", () => {
     expect(view.textContent).toContain("The voice-only scene can become a sparse midnight rain cue.");
     expect(view.textContent).toContain("no_visual_subject");
     expect(view.textContent).toContain("midnight rain");
-    expect(view.textContent).toContain("Cloud evidence");
+    expect(view.textContent).toContain("云端记录");
     expect(view.textContent).toContain("https://cdn.example.com/snapshots/session-1/turn-1.webp");
     expect(view.textContent).toContain("https://cdn.example.com/turns/session-1/turn-1.json");
   });
@@ -464,6 +487,10 @@ describe("home chat flow", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/webp;base64,fresh-frame");
 
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/audio/test-asr.wav") {
+        return createTestAsrAudioResponse();
+      }
+
       if (input === "/api/asr") {
         return new Response(JSON.stringify({ userText: "Use what you can see on the desk", provider: "fake" }), {
           status: 200,
@@ -511,12 +538,12 @@ describe("home chat flow", () => {
     });
 
     renderHome();
-    clickByText("Start camera");
+    clickByText("开启摄像头");
     await act(async () => {
       await Promise.resolve();
     });
 
-    clickByText("Test ASR");
+    clickByText("测试识别");
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -583,6 +610,10 @@ describe("home chat flow", () => {
     ];
     const asrTexts = ["Make it feel like midnight rain", "Now add tape-warped drums"];
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (input === "/audio/test-asr.wav") {
+        return createTestAsrAudioResponse();
+      }
+
       if (input === "/api/asr") {
         return new Response(JSON.stringify({ userText: asrTexts.shift(), provider: "fake" }), {
           status: 200,
@@ -606,14 +637,14 @@ describe("home chat flow", () => {
 
     const view = renderHome();
 
-    clickByText("Test ASR");
+    clickByText("测试识别");
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    clickByText("Test ASR");
+    clickByText("测试识别");
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();

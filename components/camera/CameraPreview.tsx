@@ -10,6 +10,23 @@ import { captureVideoSnapshot, type SnapshotPayload } from "@/lib/client/camera"
 
 type CameraStatus = "idle" | "requesting" | "ready" | "failed";
 
+const copy = {
+  ready: "\u6444\u50cf\u5934\u753b\u9762\u5df2\u5f00\u542f",
+  requesting: "\u6b63\u5728\u8bf7\u6c42\u6444\u50cf\u5934",
+  off: "\u6444\u50cf\u5934\u672a\u5f00\u542f",
+  liveLabel: "\u5b9e\u65f6\u6444\u50cf\u5934\u753b\u9762",
+  intro: "\u5f00\u542f\u6444\u50cf\u5934\u540e\uff0cRiff \u4f1a\u628a\u5f53\u524d\u753b\u9762\u548c\u4f60\u8bf4\u7684\u8bdd\u4e00\u8d77\u7406\u89e3\u3002\u6743\u9650\u88ab\u62d2\u7edd\u65f6\uff0c\u4e5f\u53ef\u4ee5\u7ee7\u7eed\u7eaf\u8bed\u97f3\u804a\u5929\u3002",
+  cameraDenied: "\u65e0\u6cd5\u8bbf\u95ee\u6444\u50cf\u5934\uff1b\u53ef\u4ee5\u7ee7\u7eed\u7eaf\u8bed\u97f3\u6a21\u5f0f\u3002",
+  snapshotFailed: "\u622a\u56fe\u5931\u8d25\uff1b\u6587\u5b57\u548c\u8bed\u97f3\u5bf9\u8bdd\u4ecd\u53ef\u7ee7\u7eed\u3002",
+  requestingButton: "\u8bf7\u6c42\u4e2d",
+  start: "\u5f00\u542f\u6444\u50cf\u5934",
+  capture: "\u622a\u53d6\u5f53\u524d\u753b\u9762",
+  stop: "\u5173\u95ed\u6444\u50cf\u5934",
+  latestAlt: "\u6700\u8fd1\u4e00\u6b21\u622a\u56fe",
+  snapshotReady: "\u622a\u56fe\u5df2\u51c6\u5907\u597d",
+  sent: "\u5df2\u53d1\u9001\u7ed9 AI \u89c2\u5bdf"
+};
+
 function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
 }
@@ -103,8 +120,7 @@ export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>
 
   useImperativeHandle(ref, () => ({ captureSnapshot }), [captureSnapshot]);
 
-  const previewLabel =
-    status === "ready" ? "Live camera preview" : status === "requesting" ? "Requesting camera" : "Camera is off";
+  const previewLabel = status === "ready" ? copy.ready : status === "requesting" ? copy.requesting : copy.off;
 
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -112,7 +128,7 @@ export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>
         {status === "ready" ? (
           <video
             ref={videoRef}
-            aria-label="Live camera preview"
+            aria-label={copy.liveLabel}
             className="h-full min-h-[300px] w-full object-cover"
             autoPlay
             muted
@@ -128,10 +144,7 @@ export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>
               )}
             </div>
             <p className="mt-4 text-base font-semibold">{previewLabel}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Start the camera to give Riff a live visual scene. If permission is blocked, Riff stays in voice-only
-              mode.
-            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">{copy.intro}</p>
           </div>
         )}
       </div>
@@ -140,9 +153,7 @@ export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>
         <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-900" role="status">
           <span className="font-semibold">{failureReason}</span>
           <span className="ml-2">
-            {failureReason === "no_camera_permission"
-              ? "Camera access is unavailable; continuing in voice-only mode."
-              : "Snapshot capture failed; text conversation can continue."}
+            {failureReason === "no_camera_permission" ? copy.cameraDenied : copy.snapshotFailed}
           </span>
         </div>
       ) : null}
@@ -155,7 +166,7 @@ export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>
           className="inline-flex items-center gap-2 rounded-md bg-signal px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           <Camera className="h-4 w-4" aria-hidden="true" />
-          {status === "requesting" ? "Requesting" : "Start camera"}
+          {status === "requesting" ? copy.requestingButton : copy.start}
         </button>
         <button
           type="button"
@@ -164,7 +175,7 @@ export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>
           className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
         >
           <ImagePlus className="h-4 w-4" aria-hidden="true" />
-          Capture snapshot
+          {copy.capture}
         </button>
         <button
           type="button"
@@ -173,7 +184,7 @@ export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>
           className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
         >
           <Power className="h-4 w-4" aria-hidden="true" />
-          Stop camera
+          {copy.stop}
         </button>
       </div>
 
@@ -181,7 +192,7 @@ export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>
         <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[140px_1fr]">
           <Image
             src={`data:${snapshot.mimeType};base64,${snapshot.base64}`}
-            alt="Latest compressed snapshot"
+            alt={copy.latestAlt}
             width={140}
             height={96}
             unoptimized
@@ -189,12 +200,12 @@ export const CameraPreview = forwardRef<CameraPreviewHandle, CameraPreviewProps>
           />
           <div className="flex flex-col justify-center text-sm text-slate-700">
             <p className="font-semibold text-slate-900">
-              Snapshot ready - {snapshot.width}x{snapshot.height} - {snapshot.mimeType}
+              {copy.snapshotReady} - {snapshot.width}x{snapshot.height} - {snapshot.mimeType}
             </p>
             {snapshotSent ? (
               <p className="mt-2 inline-flex items-center gap-2 text-signal">
                 <Send className="h-4 w-4" aria-hidden="true" />
-                Sent to AI observation
+                {copy.sent}
               </p>
             ) : null}
           </div>

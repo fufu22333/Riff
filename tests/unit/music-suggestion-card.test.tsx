@@ -44,7 +44,7 @@ describe("MusicSuggestionCard", () => {
     expect(view.textContent).toContain("felt piano");
     expect(view.textContent).toContain("soft pad");
     expect(view.textContent).toContain("quiet intro -> pulse");
-    expect(view.textContent).toContain("Generate music");
+    expect(view.textContent).toContain("生成音乐");
   });
 
   it("omits empty optional fields without hiding populated fields", () => {
