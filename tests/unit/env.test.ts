@@ -3,6 +3,21 @@ import { describe, expect, it } from "vitest";
 import { envSchema, parseServerEnv } from "@/lib/server/env";
 
 describe("server environment validation", () => {
+  it("accepts the documented no-key fake demo configuration", () => {
+    const parsed = parseServerEnv({
+      AI_PROVIDER: "fake",
+      ASR_PROVIDER: "fake",
+      TTS_PROVIDER: "browser",
+      STORAGE_PROVIDER: "fake",
+      QINIU_PUBLIC_DOMAIN: "https://cdn.example.com"
+    });
+
+    expect(parsed.AI_PROVIDER).toBe("fake");
+    expect(parsed.ASR_PROVIDER).toBe("fake");
+    expect(parsed.TTS_PROVIDER).toBe("browser");
+    expect(parsed.STORAGE_PROVIDER).toBe("fake");
+  });
+
   it("accepts the documented domestic-compatible P0 provider configuration", () => {
     const parsed = parseServerEnv({
       AI_PROVIDER: "openai",

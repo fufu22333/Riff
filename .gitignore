@@ -35,6 +35,7 @@ Thumbs.db
 
 # Local generated files
 .codex_tmp/
+.worktrees/
 tmp/
 temp/
 
@@ -46,6 +47,7 @@ docs/ops/*
 !docs/ops/pr4-conversation-loop-handoff.md
 !docs/ops/pr5-storage-handoff.md
 !docs/ops/pr-submission-guidelines.md
+!docs/ops/checklist.md
 
 # Media and generated demo artifacts
 *.webm

@@ -69,4 +69,30 @@ describe("CameraPreview", () => {
     expect(view.textContent).toContain("no_camera_permission");
     expect(view.textContent).toContain("voice-only mode");
   });
+
+  it("shows snapshot_failed when the active camera frame cannot be captured", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [{ stop: vi.fn() }]
+        })
+      }
+    });
+    Object.defineProperty(HTMLVideoElement.prototype, "videoWidth", { configurable: true, value: 640 });
+    Object.defineProperty(HTMLVideoElement.prototype, "videoHeight", { configurable: true, value: 360 });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+
+    const view = render(<CameraPreview />);
+    clickByText("Start camera");
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    clickByText("Capture snapshot");
+
+    expect(view.textContent).toContain("snapshot_failed");
+    expect(view.textContent).toContain("text conversation can continue");
+  });
 });
