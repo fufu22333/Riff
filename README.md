@@ -1,8 +1,8 @@
 # Riff
 
-Riff is an AI visual conversation assistant for music creators. It combines camera context, spoken intent, multimodal reasoning, music creation guidance, reference-track playback, and Qiniu-backed evidence storage in one conversational experience.
+Riff is an AI visual conversation assistant for music creators. It combines current-frame camera context, spoken intent, multimodal reasoning, music creation guidance, reference-only audio playback, and Qiniu-backed evidence storage in one conversational experience.
 
-Riff 是一款面向音乐创作者的 AI 视觉对话助手。它将摄像头画面、语音意图、多模态理解、音乐创作建议、参考音轨播放和七牛云证据留存整合到同一套对话流程中。
+Riff 是一款面向音乐创作者的 AI 视觉对话助手。它将摄像头当前帧、语音意图、多模态理解、音乐创作建议、参考音频播放和七牛云证据留存整合到同一套对话流程中。
 
 This project was built for **Qiniu XEngineer Challenge - Topic 1: AI Visual Conversation Assistant**.
 
@@ -14,13 +14,21 @@ Demo video: https://b23.tv/gEXq51i
 
 演示视频：https://b23.tv/gEXq51i
 
-注：因深夜宿舍不便录音，视频中未包含语音交互演示，明早会补充完整版（链接不变）。
+Note: the current demo video does not include the voice-interaction segment yet because it was recorded late at night. A complete version will be updated using the same link.
+
+注：因深夜宿舍不便录音，当前演示视频暂未包含语音交互片段，明早会补充完整版，链接不变。
+
+## Design Document
+
+See [docs/design.md](./docs/design.md) for the user stories, implementation scope, cost-control strategy, known limitations, and follow-up plan.
+
+设计文档见 [docs/design.md](./docs/design.md)，其中记录了用户故事、最终实现范围、成本控制策略、已知边界和后续计划。
 
 ## Features
 
-- **Camera-aware conversation** - captures the current visual scene and uses it as context for each conversation turn.
+- **Camera-aware conversation** - captures the current camera frame and uses it as context for each conversation turn.
 
-  **视觉上下文对话** - 每轮对话都会结合当前摄像头画面作为上下文。
+  **视觉上下文对话** - 每轮对话都会结合当前摄像头帧作为上下文。
 
 - **Voice-first input** - records microphone input, detects speech segments, and transcribes them into text.
 
@@ -34,9 +42,9 @@ Demo video: https://b23.tv/gEXq51i
 
   **音乐创作建议** - 输出情绪、速度、配器、结构和音乐生成提示词等创作参考。
 
-- **Reference-track playback** - generates or resolves a playable reference-only audio track for creative direction.
+- **Reference-only audio playback** - resolves a playable fallback/reference audio track for creative direction. This is not a full commercial music-generation system.
 
-  **参考音轨播放** - 提供可播放的参考音轨，帮助用户快速感受创作方向。
+  **参考音频播放** - 提供可播放的参考音频，帮助用户快速感受创作方向；当前不是完整可商用音乐生成系统。
 
 - **Qiniu evidence storage** - stores key artifacts such as snapshots, turn records, session records, and reference audio.
 
@@ -47,13 +55,13 @@ Demo video: https://b23.tv/gEXq51i
 ```text
 Camera preview -> Voice recording -> ASR -> Current-frame snapshot
 -> Multimodal chat -> Visual evidence + music suggestion
--> Optional TTS / reference-track playback -> Qiniu evidence storage
+-> Optional browser TTS / reference-only audio playback -> Qiniu evidence storage
 ```
 
 ```text
 摄像头预览 -> 语音录制 -> ASR 转写 -> 当前帧截图
 -> 多模态对话 -> 视觉证据 + 音乐建议
--> 可选 TTS / 参考音轨播放 -> 七牛云证据留存
+-> 可选浏览器朗读 / 参考音频播放 -> 七牛云证据留存
 ```
 
 ## Main Routes
@@ -61,7 +69,7 @@ Camera preview -> Voice recording -> ASR -> Current-frame snapshot
 - `POST /api/asr` - transcribes recorded audio.
 - `POST /api/chat` - handles the main multimodal conversation.
 - `POST /api/tts` and `GET /api/tts/{jobId}` - support asynchronous speech playback.
-- `POST /api/generate` and `GET /api/generate/{jobId}` - handle reference-track generation.
+- `POST /api/generate` and `GET /api/generate/{jobId}` - handle reference-only audio jobs and fallback playback.
 - `GET /api/generate/sample` - returns a browser-playable sample reference track.
 
 ## Project Structure
@@ -71,6 +79,8 @@ Camera preview -> Voice recording -> ASR -> Current-frame snapshot
 - `lib/client/` - browser-side camera and recorder helpers.
 - `lib/contracts/` - shared API request and response schemas.
 - `lib/server/` - server-side providers for AI, ASR, storage, TTS, and music generation.
+- `docs/design.md` - review-facing design document required by the challenge.
+- `tests/` - unit, API, and Playwright smoke tests.
 
 ## Local Development
 
@@ -99,6 +109,14 @@ On Windows PowerShell:
 Copy-Item .env.example .env.local
 ```
 
+## Verification
+
+```bash
+npm run typecheck
+npm test
+npm run test:smoke
+```
+
 ## Tech Stack
 
 - Next.js / React
@@ -108,6 +126,7 @@ Copy-Item .env.example .env.local
 - Vitest
 - Playwright
 - Qiniu Cloud Storage
+- OpenAI-compatible multimodal chat / ASR providers
 
 ## Original Work
 
@@ -134,3 +153,15 @@ The original work in this repository includes:
 - Qiniu evidence flow for snapshots, JSON artifacts, and reference audio.
 
   面向截图、JSON 产物与参考音频的七牛云证据链路。
+
+## Current Boundaries
+
+- Vision is snapshot-based: each conversation turn sends the current camera frame, not a continuous live video stream.
+- Real microphone interaction is implemented but still needs a final quiet-room manual demo recording.
+- Reference audio is marked as reference-only. The current build uses fake/fallback generation rather than a commercial music-generation provider.
+
+## 当前边界
+
+- 视觉理解基于每轮当前帧截图，不是连续视频流理解。
+- 真实麦克风交互链路已经实现，但仍需要在安静环境补录真人演示。
+- 参考音频明确标记为仅供参考；当前版本使用 fake/fallback 生成链路，不是完整可商用音乐生成服务。
