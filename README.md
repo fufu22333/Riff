@@ -14,9 +14,7 @@ Demo video: https://b23.tv/gEXq51i
 
 演示视频：https://b23.tv/gEXq51i
 
-Note: the current demo video does not include the voice-interaction segment yet. The complete version will be updated using the same link.
-
-注：当前演示视频暂未包含语音交互片段，完整版会更新到同一链接。
+注：因深夜宿舍不便录音，视频中未包含语音交互演示，明早会补充完整版（链接不变）。
 
 ## Features
 
